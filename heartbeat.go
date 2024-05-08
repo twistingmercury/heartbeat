@@ -8,12 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// StatusHandlerFunc is a function that returns the status of a resource.
+type StatusHandlerFunc func() (status StatusResult)
+
 // DependencyDescriptor defines a resource to be checked during a heartbeat request.
 type DependencyDescriptor struct {
-	Name        string                    `json:"name"`
-	Type        string                    `json:"type"`
-	Connection  string                    `json:"connection"`
-	HandlerFunc func() (hsr StatusResult) `json:"-"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"`
+	Connection  string            `json:"connection"`
+	HandlerFunc StatusHandlerFunc `json:"-"`
 }
 
 func (d *DependencyDescriptor) String() string {
