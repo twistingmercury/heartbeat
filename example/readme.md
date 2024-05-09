@@ -91,4 +91,4 @@ If you find any issues or have suggestions for improvements, please open an issu
 
 ## License
 
-This example application is open-source software released under the [MIT License](https://opensource.org/licenses/MIT).
+This example application is open-source software released under the [MIT License](../LICENSE).
