@@ -2,7 +2,8 @@
 
 Heartbeat is a Go package that provides a simple way to add health check functionality to your web applications. It 
 allows you to define dependencies that your service relies on and provides an endpoint to check the health status of 
-your application and its dependencies.
+your application and its dependencies. This can also be used as a simple way to create an HTTP [readiness and liveness probe](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#http-probes) 
+probe for your Kubernetes deployments.
 
 ## Installation
 
