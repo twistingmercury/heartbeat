@@ -1,7 +1,11 @@
 package heartbeat
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -58,6 +62,11 @@ func (h *Response) String() string {
 
 var (
 	dependencies []DependencyDescriptor
+	server       *http.Server
+	hbPort       int
+	epname       string
+	sname        string
+	ctx          context.Context
 )
 
 // Handler returns the health of the app as a Response object.
@@ -80,6 +89,47 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 	}
 }
 
+// Initialize sets up the heartbeat functionality.
+func Initialize(context context.Context, port int, svcName, endpointName string, deps ...DependencyDescriptor) error {
+	switch {
+	case context == nil:
+		return errors.New("context is nil")
+	case port < 1024 || port > 49151:
+		return errors.New("invalid port number")
+	case len(svcName) == 0:
+		return errors.New("missing service name")
+	case len(endpointName) == 0:
+		return errors.New("missing endpoint name")
+	}
+	ctx = context
+	hbPort = port
+	epname = endpointName
+	sname = svcName
+	dependencies = deps
+	return nil
+}
+
+func Publish() {
+	go func() {
+		gin.SetMode(gin.ReleaseMode)
+		router := gin.New()
+		router.Use(gin.Recovery())
+		router.GET(fmt.Sprintf("/%s", epname), Handler(sname, dependencies...))
+		server = &http.Server{
+			Addr:    fmt.Sprintf(":%d", hbPort),
+			Handler: router.Handler(),
+		}
+
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal("metrics endpoint failed with error")
+		}
+	}()
+}
+
+func Shutdown() error {
+	return server.Shutdown(ctx)
+}
+
 func checkDeps(deps []DependencyDescriptor) (status Status, hbl []StatusResult) {
 	for _, desc := range deps {
 		hsr := StatusResult{Status: StatusOK}
@@ -98,6 +148,7 @@ func checkDeps(deps []DependencyDescriptor) (status Status, hbl []StatusResult) 
 	return
 }
 
+//goland:noinspection ALL
 func checkURL(url string) StatusResult {
 	hsr := StatusResult{
 		Resource: url,

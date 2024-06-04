@@ -23,7 +23,7 @@ import "github.com/twistingmercury/heartbeat"
 ## Defining Dependencies
 
 Heartbeat allows you to define dependencies that your service relies on. These dependencies can be HTTP endpoints or
-custom handler functions that check the status of other remote resources, such as a database, message queue, etc.
+custom Handler functions that check the status of other remote resources, such as a database, message queue, etc.
 
 ### HTTP Dependencies
 
@@ -39,7 +39,7 @@ dep01 := heartbeat.DependencyDescriptor{
 ```
 ### Custom Depndencies
 
-Define custom dependencies using the `DependencyDescriptor` struct by supplying a name and a handler function that is of
+Define custom dependencies using the `DependencyDescriptor` struct by supplying a name and a Handler function that is of
 type `heartbeat.StatusHandlerFunc`:
 
 ```go

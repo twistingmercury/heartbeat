@@ -1,8 +1,10 @@
 package heartbeat_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,6 +27,27 @@ func testServer(status int, delay bool) *httptest.Server {
 				return
 			}
 		}))
+}
+
+func TestInitialize(t *testing.T) {
+	assert.Error(t, heartbeat.Initialize(nil, 1024, "unit", "heartbeat"))
+	assert.Error(t, heartbeat.Initialize(context.TODO(), 1023, "unit", "heartbeat"))
+	assert.Error(t, heartbeat.Initialize(context.TODO(), 49152, "unit", "heartbeat"))
+	assert.Error(t, heartbeat.Initialize(context.TODO(), 49152, "", "heartbeat"))
+	assert.Error(t, heartbeat.Initialize(context.TODO(), 8181, "unit", ""))
+	assert.NoError(t, heartbeat.Initialize(context.TODO(), 8181, "unit", "heartbeat"))
+}
+
+func TestPublish(t *testing.T) {
+	//ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx := context.Background()
+	err := heartbeat.Initialize(ctx, 8181, "unit", "heartbeat")
+	require.NoError(t, err)
+	heartbeat.Publish()
+	//<-ctx.Done()
+	time.Sleep(2 * time.Second)
+	err = heartbeat.Shutdown()
+	require.NoError(t, err)
 }
 
 func TestDependencyHandlerFunc(t *testing.T) {

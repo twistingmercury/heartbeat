@@ -82,7 +82,7 @@ The application configuration is defined in the `docker-compose.yaml` file. It s
 You can customize the example application by modifying the following:
 
 - Dependencies: Add, remove, or modify the dependencies defined in the `main.go` file.
-- Handler Functions: Implement custom handler functions for your dependencies in the `main.go` file.
+- Handler Functions: Implement custom Handler functions for your dependencies in the `main.go` file.
 - Configuration: Update the configuration in the `docker-compose.yaml` file to match your environment.
 
 ## Contributing

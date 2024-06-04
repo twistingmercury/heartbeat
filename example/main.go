@@ -35,7 +35,7 @@ func main() {
 	}
 
 	// Register the healthcheck endpoint by passing the name of the service
-	r.GET("/healthcheck", heartbeat.Handler("example", deps...))
+	r.GET("/healthcheck", heartbeat.handler("example", deps...))
 	if err := r.Run(); err != nil {
 		log.Fatal(err)
 	}
