@@ -129,6 +129,7 @@ func TestHandlerReturnCritical(t *testing.T) {
 	err := json.Unmarshal(data, &hcr)
 	assert.NoError(t, err)
 	assert.Equal(t, heartbeat.StatusCritical, hcr.Status)
+	assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
 
 	str := string(data)
 	exp := hcr.String()
@@ -207,4 +208,112 @@ func TestDependencyTypeString(t *testing.T) {
 	assert.Equal(t, "OK", heartbeat.StatusOK.String())
 	assert.Equal(t, "Warning", heartbeat.StatusWarning.String())
 	assert.Equal(t, "Critical", heartbeat.StatusCritical.String())
+}
+
+func TestCheckURLValidation(t *testing.T) {
+	tests := []struct {
+		name           string
+		url            string
+		expectedStatus heartbeat.Status
+		messageContain string
+	}{
+		{
+			name:           "invalid URL scheme - file",
+			url:            "file:///etc/passwd",
+			expectedStatus: heartbeat.StatusCritical,
+			messageContain: "unsupported URL scheme",
+		},
+		{
+			name:           "invalid URL scheme - ftp",
+			url:            "ftp://example.com",
+			expectedStatus: heartbeat.StatusCritical,
+			messageContain: "unsupported URL scheme",
+		},
+		{
+			name:           "malformed URL",
+			url:            "not a url at all",
+			expectedStatus: heartbeat.StatusCritical,
+			messageContain: "unsupported URL scheme",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := heartbeat.CheckURL(tt.url)
+			assert.Equal(t, tt.expectedStatus, result.Status)
+			assert.Contains(t, result.Message, tt.messageContain)
+		})
+	}
+}
+
+func TestCheckURL400StatusCodes(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		expectedStatus heartbeat.Status
+		messageContain string
+	}{
+		{
+			name:           "404 Not Found",
+			statusCode:     404,
+			expectedStatus: heartbeat.StatusCritical,
+			messageContain: "client error",
+		},
+		{
+			name:           "401 Unauthorized",
+			statusCode:     401,
+			expectedStatus: heartbeat.StatusCritical,
+			messageContain: "client error",
+		},
+		{
+			name:           "403 Forbidden",
+			statusCode:     403,
+			expectedStatus: heartbeat.StatusCritical,
+			messageContain: "client error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := testServer(tt.statusCode, false)
+			defer ts.Close()
+
+			result := heartbeat.CheckURL(ts.URL)
+			assert.Equal(t, tt.expectedStatus, result.Status)
+			assert.Contains(t, result.Message, tt.messageContain)
+		})
+	}
+}
+
+func TestCheckURL300StatusCodes(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		expectedStatus heartbeat.Status
+		messageContain string
+	}{
+		{
+			name:           "301 Moved Permanently",
+			statusCode:     301,
+			expectedStatus: heartbeat.StatusWarning,
+			messageContain: "redirect",
+		},
+		{
+			name:           "302 Found",
+			statusCode:     302,
+			expectedStatus: heartbeat.StatusWarning,
+			messageContain: "redirect",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := testServer(tt.statusCode, false)
+			defer ts.Close()
+
+			result := heartbeat.CheckURL(ts.URL)
+			assert.Equal(t, tt.expectedStatus, result.Status)
+			assert.Contains(t, result.Message, tt.messageContain)
+		})
+	}
 }
