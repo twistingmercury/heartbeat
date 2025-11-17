@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/gocql/gocql"
 	"net/http"
 	"time"
+
+	"github.com/gocql/gocql"
 
 	"log"
 
@@ -17,7 +18,6 @@ func main() {
 	// Define the dependencies that the service relies on
 	deps := []heartbeat.DependencyDescriptor{
 		{
-
 			Connection: "https://golang.org/",
 			Name:       "Golang Site",
 			Type:       "Website",
