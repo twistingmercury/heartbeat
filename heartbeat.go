@@ -1,10 +1,12 @@
 package heartbeat
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -68,7 +70,10 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 			Resource:    svcName,
 			UtcDateTime: time.Now().UTC(),
 		}
-		status, checkedDeps := checkDeps(deps)
+
+		// Get context from request for cancellation and deadline propagation
+		ctx := c.Request.Context()
+		status, checkedDeps := checkDeps(ctx, deps)
 		hb.Dependencies = checkedDeps
 		hb.Status = status
 
@@ -84,25 +89,89 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 	}
 }
 
-func checkDeps(deps []DependencyDescriptor) (status Status, hbl []StatusResult) {
-	for _, desc := range deps {
-		hsr := StatusResult{Status: StatusOK}
-		switch {
-		case desc.HandlerFunc != nil:
-			hsr = desc.HandlerFunc()
-		default:
-			hsr = checkURL(desc.Connection, desc.Timeout)
-		}
-		if hsr.Status > status {
-			status = hsr.Status
-		}
-		hsr.Name = desc.Name
-		hbl = append(hbl, hsr)
+func checkDeps(ctx context.Context, deps []DependencyDescriptor) (status Status, hbl []StatusResult) {
+	// Pre-allocate results slice with known length
+	results := make([]StatusResult, len(deps))
+
+	// Use WaitGroup for concurrent dependency checking
+	var wg sync.WaitGroup
+	var mu sync.Mutex // Protect status variable
+
+	for i, desc := range deps {
+		wg.Add(1)
+		go func(index int, d DependencyDescriptor) {
+			defer wg.Done()
+
+			var hsr StatusResult
+
+			switch {
+			case d.HandlerFunc != nil:
+				// Wrap custom handler with timeout enforcement
+				hsr = executeHandlerWithTimeout(ctx, d.HandlerFunc, d.Timeout)
+			default:
+				hsr = checkURL(ctx, d.Connection, d.Timeout)
+			}
+
+			// Set name from descriptor
+			hsr.Name = d.Name
+
+			// Fix Issue #1: Set Resource field for custom handlers if empty
+			if hsr.Resource == "" {
+				hsr.Resource = d.Name
+			}
+
+			// Thread-safe status update
+			mu.Lock()
+			if hsr.Status > status {
+				status = hsr.Status
+			}
+			results[index] = hsr
+			mu.Unlock()
+		}(i, desc)
 	}
-	return
+
+	wg.Wait()
+	return status, results
 }
 
-func checkURL(urlStr string, timeout time.Duration) StatusResult {
+// executeHandlerWithTimeout wraps custom handler execution with timeout enforcement
+func executeHandlerWithTimeout(ctx context.Context, handler StatusHandlerFunc, timeout time.Duration) StatusResult {
+	// Default timeout for custom handlers
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
+
+	// Create timeout context
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// Channel to receive result
+	resultChan := make(chan StatusResult, 1)
+
+	// Execute handler in goroutine
+	go func() {
+		result := handler()
+		select {
+		case resultChan <- result:
+		case <-timeoutCtx.Done():
+			// Handler finished but context already timed out, discard result
+		}
+	}()
+
+	// Wait for result or timeout
+	select {
+	case result := <-resultChan:
+		return result
+	case <-timeoutCtx.Done():
+		// Timeout or cancellation occurred
+		return StatusResult{
+			Status:  StatusCritical,
+			Message: fmt.Sprintf("custom handler timeout after %v", timeout),
+		}
+	}
+}
+
+func checkURL(ctx context.Context, urlStr string, timeout time.Duration) StatusResult {
 	var hsr StatusResult
 	st := time.Now()
 
@@ -139,14 +208,27 @@ func checkURL(urlStr string, timeout time.Duration) StatusResult {
 		Timeout: timeout,
 	}
 
+	// Create request with context for cancellation support
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("failed to create request: %v", err)
+		return hsr
+	}
+
 	// Make HTTP request
-	r, err := client.Get(urlStr)
+	r, err := client.Do(req)
 	elapsed := time.Since(st)
 	hsr.RequestDuration = float64(elapsed.Microseconds()) / 1000
 
 	if err != nil {
 		hsr.Status = StatusCritical
-		hsr.Message = fmt.Sprintf("HTTP request failed: %v", err)
+		// Check if error is due to context cancellation
+		if ctx.Err() != nil {
+			hsr.Message = fmt.Sprintf("request cancelled: %v", ctx.Err())
+		} else {
+			hsr.Message = fmt.Sprintf("HTTP request failed: %v", err)
+		}
 		return hsr
 	}
 
