@@ -2,7 +2,9 @@ package heartbeat
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +19,7 @@ type DependencyDescriptor struct {
 	Type        string            `json:"type"`
 	Connection  string            `json:"connection"`
 	HandlerFunc StatusHandlerFunc `json:"-"`
+	Timeout     time.Duration     `json:"timeout,omitempty"`
 }
 
 func (d *DependencyDescriptor) String() string {
@@ -56,13 +59,8 @@ func (h *Response) String() string {
 	return string(text)
 }
 
-var (
-	dependencies []DependencyDescriptor
-)
-
 // Handler returns the health of the app as a Response object.
 func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
-	dependencies = deps
 	return func(c *gin.Context) {
 		st := time.Now()
 
@@ -70,13 +68,19 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 			Resource:    svcName,
 			UtcDateTime: time.Now().UTC(),
 		}
-		status, deps := checkDeps(dependencies)
-		hb.Dependencies = deps
+		status, checkedDeps := checkDeps(deps)
+		hb.Dependencies = checkedDeps
 		hb.Status = status
 
 		hb.RequestDuration = float64(time.Since(st).Microseconds()) / 1000
 
-		c.JSON(http.StatusOK, hb)
+		httpStatus := http.StatusOK
+		if hb.Status == StatusCritical {
+			httpStatus = http.StatusServiceUnavailable // 503
+		} else if hb.Status == StatusWarning {
+			httpStatus = http.StatusOK // 200 - still operational but degraded
+		}
+		c.JSON(httpStatus, hb)
 	}
 }
 
@@ -87,7 +91,7 @@ func checkDeps(deps []DependencyDescriptor) (status Status, hbl []StatusResult) 
 		case desc.HandlerFunc != nil:
 			hsr = desc.HandlerFunc()
 		default:
-			hsr = checkURL(desc.Connection)
+			hsr = checkURL(desc.Connection, desc.Timeout)
 		}
 		if hsr.Status > status {
 			status = hsr.Status
@@ -98,35 +102,80 @@ func checkDeps(deps []DependencyDescriptor) (status Status, hbl []StatusResult) 
 	return
 }
 
-func checkURL(url string) StatusResult {
-	hsr := StatusResult{
-		Resource: url,
-		Status:   StatusNotSet,
-	}
-
+func checkURL(urlStr string, timeout time.Duration) StatusResult {
+	var hsr StatusResult
 	st := time.Now()
-	r, err := http.Get(url)
-	elapsed := time.Since(st)
-	hsr.RequestDuration = float64(elapsed.Microseconds()) / 1000
+
+	// Validate URL
+	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("invalid URL: %v", err)
+		hsr.Resource = urlStr
+		hsr.Name = urlStr
+		return hsr
+	}
+
+	// Only allow HTTP and HTTPS schemes
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("unsupported URL scheme: %s (only http/https allowed)", parsedURL.Scheme)
+		hsr.Resource = urlStr
+		hsr.Name = urlStr
+		return hsr
+	}
+
+	hsr.Name = urlStr
+	hsr.Resource = urlStr
+	hsr.Status = StatusNotSet
+
+	// Set timeout with default
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
+	// Make HTTP request
+	r, err := client.Get(urlStr)
+	elapsed := time.Since(st)
+	hsr.RequestDuration = float64(elapsed.Microseconds()) / 1000
+
+	if err != nil {
+		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("HTTP request failed: %v", err)
 		return hsr
 	}
 
 	defer r.Body.Close()
 	hsr.StatusCode = r.StatusCode
 
+	// Evaluate status based on HTTP status code and response time
 	switch {
-	case elapsed > 3*time.Second && r.StatusCode >= 200 && r.StatusCode <= 299:
+	case r.StatusCode >= 500:
+		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("server error (HTTP %d)", r.StatusCode)
+	case r.StatusCode >= 400:
+		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("client error (HTTP %d)", r.StatusCode)
+	case r.StatusCode >= 300:
 		hsr.Status = StatusWarning
-	case r.StatusCode >= 100 && r.StatusCode <= 299:
-		hsr.Status = StatusOK
-		hsr.Message = "ok"
-	case r.StatusCode >= 300 && r.StatusCode <= 399:
-		hsr.Status = StatusWarning
-	case r.StatusCode >= 200 && r.StatusCode <= 299:
+		hsr.Message = fmt.Sprintf("redirect (HTTP %d)", r.StatusCode)
+	case r.StatusCode >= 200:
+		if elapsed > 3*time.Second {
+			hsr.Status = StatusWarning
+			hsr.Message = fmt.Sprintf("slow response (%v)", elapsed)
+		} else {
+			hsr.Status = StatusOK
+			hsr.Message = "ok"
+		}
 	default:
 		hsr.Status = StatusCritical
+		hsr.Message = fmt.Sprintf("unexpected status (HTTP %d)", r.StatusCode)
 	}
+
 	return hsr
 }
