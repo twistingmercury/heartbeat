@@ -1,16 +1,10 @@
 package heartbeat
 
-import (
-	"context"
-	"time"
-)
+// CheckDeps is exported for testing
+var CheckDeps = checkDeps
 
-// CheckDeps wraps checkDeps for testing with a background context
-func CheckDeps(deps []DependencyDescriptor) (Status, []StatusResult) {
-	return checkDeps(context.Background(), deps)
-}
+// CheckURL is exported for testing
+var CheckURL = checkURL
 
-// CheckURL wraps checkURL for testing with a default timeout and background context
-func CheckURL(urlStr string) StatusResult {
-	return checkURL(context.Background(), urlStr, 10*time.Second)
-}
+// ExecuteHandlerWithTimeout is exported for testing
+var ExecuteHandlerWithTimeout = executeHandlerWithTimeout

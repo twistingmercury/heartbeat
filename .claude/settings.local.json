@@ -4,7 +4,14 @@
       "Bash(go test:*)",
       "Bash(go vet:*)",
       "Bash(govulncheck:*)",
-      "Bash(go list:*)"
+      "Bash(go list:*)",
+      "Bash(gofmt:*)",
+      "Bash(go tool cover:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(cat:*)",
+      "Bash(staticcheck:*)",
+      "Bash(go build:*)",
+      "Bash(npx markdownlint:*)"
     ],
     "deny": [],
     "ask": []

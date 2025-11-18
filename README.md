@@ -1,7 +1,7 @@
 # Heartbeat
 
-> **Maturity Level**: Basic - Production-ready health check library with
-> stable core features
+> **Maturity Level**: Mature - Production-ready with comprehensive testing,
+> panic recovery, and stable API
 
 A Go package providing health check functionality with support for HTTP and
 custom dependency monitoring.
@@ -138,6 +138,11 @@ all registered dependencies in parallel, each with its own timeout protection.
 HTTP dependencies are checked by making requests to their configured URLs,
 while custom dependencies execute user-provided handler functions. The overall
 service health is determined by the most severe status among all dependencies.
+
+Custom handler functions are protected with automatic panic recovery to prevent
+crashes from unexpected errors in user code. Context cancellation and timeout
+handling ensure that checks respect configured time limits and respond properly
+to cancelled requests.
 
 The package uses Go's standard HTTP client for HTTP dependencies and supports
 both synchronous and asynchronous health checks. Response times are measured

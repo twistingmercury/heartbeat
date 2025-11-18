@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -66,8 +67,15 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		st := time.Now()
 
+		// Get hostname; use empty string as fallback if unavailable
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = ""
+		}
+
 		hb := Response{
 			Resource:    svcName,
+			Machine:     hostname,
 			UtcDateTime: time.Now().UTC(),
 		}
 
@@ -80,10 +88,13 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 		hb.RequestDuration = float64(time.Since(st).Microseconds()) / 1000
 
 		httpStatus := http.StatusOK
-		if hb.Status == StatusCritical {
+		switch hb.Status {
+		case StatusCritical:
 			httpStatus = http.StatusServiceUnavailable // 503
-		} else if hb.Status == StatusWarning {
+		case StatusWarning:
 			httpStatus = http.StatusOK // 200 - still operational but degraded
+		case StatusOK, StatusNotSet:
+			httpStatus = http.StatusOK // 200 - healthy or no dependencies checked
 		}
 		c.JSON(httpStatus, hb)
 	}
@@ -148,8 +159,23 @@ func executeHandlerWithTimeout(ctx context.Context, handler StatusHandlerFunc, t
 	// Channel to receive result
 	resultChan := make(chan StatusResult, 1)
 
-	// Execute handler in goroutine
+	// Execute handler in goroutine with panic recovery
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Panic occurred in handler - convert to critical status result
+				panicResult := StatusResult{
+					Status:  StatusCritical,
+					Message: fmt.Sprintf("panic in custom handler: %v", r),
+				}
+				select {
+				case resultChan <- panicResult:
+				case <-timeoutCtx.Done():
+					// Context already timed out, discard panic result
+				}
+			}
+		}()
+
 		result := handler()
 		select {
 		case resultChan <- result:
@@ -232,7 +258,9 @@ func checkURL(ctx context.Context, urlStr string, timeout time.Duration) StatusR
 		return hsr
 	}
 
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close() // Error intentionally ignored - cleanup operation after successful request
+	}()
 	hsr.StatusCode = r.StatusCode
 
 	// Evaluate status based on HTTP status code and response time
