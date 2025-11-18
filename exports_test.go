@@ -1,6 +1,10 @@
 package heartbeat
 
-var (
-	CheckDeps = checkDeps
-	CheckURL  = checkURL
-)
+// CheckDeps is exported for testing
+var CheckDeps = checkDeps
+
+// CheckURL is exported for testing
+var CheckURL = checkURL
+
+// ExecuteHandlerWithTimeout is exported for testing
+var ExecuteHandlerWithTimeout = executeHandlerWithTimeout

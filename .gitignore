@@ -1,7 +1,8 @@
-[Bb]in/
+**/bin/
 **/*.env
 **/*.out
 _*
+./.claude/settings.local.json
 
 # Mac OS
 # General
