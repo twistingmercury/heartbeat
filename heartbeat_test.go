@@ -1423,11 +1423,14 @@ func TestCheckDepsRace(t *testing.T) {
 				deps := make([]heartbeat.DependencyDescriptor, 15)
 				for i := 0; i < 15; i++ {
 					// Create different handler statuses to create concurrent mutex contention
-					status := heartbeat.StatusOK
-					if i%3 == 1 {
+					var status heartbeat.Status
+					switch i % 3 {
+					case 1:
 						status = heartbeat.StatusWarning
-					} else if i%3 == 2 {
+					case 2:
 						status = heartbeat.StatusCritical
+					default:
+						status = heartbeat.StatusOK
 					}
 
 					// Capture status in closure
