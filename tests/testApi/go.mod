@@ -1,6 +1,6 @@
-module example
+module test/target
 
-replace github.com/twistingmercury/heartbeat => ../
+replace github.com/twistingmercury/heartbeat => ../../
 
 go 1.24.0
 
