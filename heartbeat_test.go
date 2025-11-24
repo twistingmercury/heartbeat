@@ -1660,3 +1660,152 @@ func TestHandlerMachineField(t *testing.T) {
 	assert.NotNil(t, hcr.Machine,
 		"Machine field should not be nil")
 }
+
+// TestHandlerNameField verifies that the Name field in the Response struct
+// is correctly populated with the svcName parameter passed to Handler.
+func TestHandlerNameField(t *testing.T) {
+	tests := []struct {
+		name            string
+		svcName         string
+		setupDeps       func(t *testing.T) []heartbeat.DependencyDescriptor
+		expectedName    string
+		expectedResource string
+		description     string
+	}{
+		{
+			name:    "service name is set in both Name and Resource fields",
+			svcName: "my-service",
+			setupDeps: func(t *testing.T) []heartbeat.DependencyDescriptor {
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				t.Cleanup(ts.Close)
+				return []heartbeat.DependencyDescriptor{
+					{Connection: ts.URL, Name: "test-dep", Type: "HTTP"},
+				}
+			},
+			expectedName:     "my-service",
+			expectedResource: "my-service",
+			description:      "Both Name and Resource should be set to svcName parameter",
+		},
+		{
+			name:    "empty service name results in empty Name and Resource",
+			svcName: "",
+			setupDeps: func(t *testing.T) []heartbeat.DependencyDescriptor {
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				t.Cleanup(ts.Close)
+				return []heartbeat.DependencyDescriptor{
+					{Connection: ts.URL, Name: "test-dep", Type: "HTTP"},
+				}
+			},
+			expectedName:     "",
+			expectedResource: "",
+			description:      "Empty svcName should result in empty Name and Resource fields",
+		},
+		{
+			name:    "service name with special characters",
+			svcName: "service-name_v2.0",
+			setupDeps: func(t *testing.T) []heartbeat.DependencyDescriptor {
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				t.Cleanup(ts.Close)
+				return []heartbeat.DependencyDescriptor{
+					{Connection: ts.URL, Name: "test-dep", Type: "HTTP"},
+				}
+			},
+			expectedName:     "service-name_v2.0",
+			expectedResource: "service-name_v2.0",
+			description:      "Service name with special characters should be preserved exactly",
+		},
+		{
+			name:    "service name with spaces",
+			svcName: "My Service Name",
+			setupDeps: func(t *testing.T) []heartbeat.DependencyDescriptor {
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				t.Cleanup(ts.Close)
+				return []heartbeat.DependencyDescriptor{
+					{Connection: ts.URL, Name: "test-dep", Type: "HTTP"},
+				}
+			},
+			expectedName:     "My Service Name",
+			expectedResource: "My Service Name",
+			description:      "Service name with spaces should be preserved exactly",
+		},
+		{
+			name:    "service name with no dependencies",
+			svcName: "standalone-service",
+			setupDeps: func(t *testing.T) []heartbeat.DependencyDescriptor {
+				return []heartbeat.DependencyDescriptor{}
+			},
+			expectedName:     "standalone-service",
+			expectedResource: "standalone-service",
+			description:      "Name and Resource should be set even when no dependencies are provided",
+		},
+		{
+			name:    "service name with custom handler dependencies",
+			svcName: "custom-handler-service",
+			setupDeps: func(t *testing.T) []heartbeat.DependencyDescriptor {
+				return []heartbeat.DependencyDescriptor{
+					{
+						Name: "custom-dep",
+						Type: "Custom",
+						HandlerFunc: func() heartbeat.StatusResult {
+							return heartbeat.StatusResult{
+								Status:   heartbeat.StatusOK,
+								Resource: "custom-resource",
+								Message:  "ok",
+							}
+						},
+					},
+				}
+			},
+			expectedName:     "custom-handler-service",
+			expectedResource: "custom-handler-service",
+			description:      "Name and Resource should be set correctly with custom handler dependencies",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deps := tt.setupDeps(t)
+
+			// Set up Gin test context
+			gin.SetMode(gin.TestMode)
+			resp := httptest.NewRecorder()
+			c, r := gin.CreateTestContext(resp)
+
+			// Create request
+			req, _ := http.NewRequest(http.MethodGet, "/health", nil)
+
+			// Set up handler and serve request
+			r.GET("/health", heartbeat.Handler(tt.svcName, deps...))
+			c.Request = req
+			r.ServeHTTP(resp, c.Request)
+
+			// Parse response body
+			var hcr heartbeat.Response
+			err := json.Unmarshal(resp.Body.Bytes(), &hcr)
+			assert.NoError(t, err, "%s: Failed to unmarshal response", tt.description)
+
+			// Verify Name field is set correctly
+			assert.Equal(t, tt.expectedName, hcr.Name,
+				"%s: Name field should be set to '%s', got '%s'",
+				tt.description, tt.expectedName, hcr.Name)
+
+			// Verify Resource field is also set correctly (both should match svcName)
+			assert.Equal(t, tt.expectedResource, hcr.Resource,
+				"%s: Resource field should be set to '%s', got '%s'",
+				tt.description, tt.expectedResource, hcr.Resource)
+
+			// Verify Name and Resource fields match each other
+			assert.Equal(t, hcr.Name, hcr.Resource,
+				"%s: Name and Resource fields should match, Name='%s', Resource='%s'",
+				tt.description, hcr.Name, hcr.Resource)
+		})
+	}
+}

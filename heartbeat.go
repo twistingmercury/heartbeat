@@ -74,6 +74,7 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 		}
 
 		hb := Response{
+			Name:        svcName,
 			Resource:    svcName,
 			Machine:     hostname,
 			UtcDateTime: time.Now().UTC(),
