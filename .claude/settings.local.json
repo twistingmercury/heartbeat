@@ -42,7 +42,8 @@
       "Bash(/dev/null)",
       "Bash(then echo \"TestApi ready\")",
       "Bash(TESTAPI_URL=http://localhost:8080 go test:*)",
-      "Bash(make)"
+      "Bash(make)",
+      "Bash(shellcheck:*)"
     ],
     "deny": [],
     "ask": [],
