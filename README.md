@@ -98,7 +98,7 @@ The health check endpoint returns a JSON response with the following structure:
     {
       "status": "OK",
       "name": "My custom dependency",
-      "resource": "",
+      "resource": "My custom dependency",
       "request_duration_ms": 20,
       "http_status_code": 0,
       "message": "My custom dependency is healthy"
@@ -123,7 +123,7 @@ The Heartbeat package defines the following health statuses:
 
 The HTTP status code of the response is determined by the overall health status:
 
-- `200 OK`: When the overall status is `OK` or `Warning`
+- `200 OK`: When the overall status is `NotSet`, `OK`, or `Warning`
 - `503 Service Unavailable`: When the overall status is `Critical`
 
 For HTTP dependencies, the `http_status_code` field contains the actual HTTP
@@ -165,7 +165,7 @@ for each dependency to help identify performance issues.
 
 ### Quick Start
 
-Requires Go 1.25+ - [Installation instructions](https://golang.org/doc/install)
+Requires Go 1.24+ - [Installation instructions](https://golang.org/doc/install)
 
 Clone the repository:
 
