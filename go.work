@@ -4,4 +4,5 @@ use (
 	.
 	example
 	tests/testApi
+	tests/e2e
 )

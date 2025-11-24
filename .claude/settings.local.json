@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(govulncheck:*)",
+      "Bash(go list:*)",
+      "Bash(gofmt:*)",
+      "Bash(go tool cover:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(cat:*)",
+      "Bash(staticcheck:*)",
+      "Bash(go build:*)",
+      "Bash(npx markdownlint:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(go get:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go mod why:*)",
+      "Bash(docker build:*)",
+      "Bash(docker images:*)",
+      "Bash(docker run:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker ps:*)",
+      "Bash(curl:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker compose build:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker:*)",
+      "Bash(for i in {1..40})",
+      "Bash(do if docker exec e2e-cassandra cqlsh -e \"SELECT release_version FROM system.local\")",
+      "Bash(then echo \"Cassandra ready\")",
+      "Bash(break)",
+      "Bash(fi)",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(for i in {1..20})",
+      "Bash(do if docker exec e2e-rabbitmq rabbitmq-diagnostics -q ping)",
+      "Bash(then echo \"RabbitMQ ready\")",
+      "Bash(do if curl -sf http://localhost:8080/health)",
+      "Bash(/dev/null)",
+      "Bash(then echo \"TestApi ready\")",
+      "Bash(TESTAPI_URL=http://localhost:8080 go test:*)",
+      "Bash(make)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "/Users/doublej/dev/mcp/team-agentic-setup"
+    ]
+  }
+}
