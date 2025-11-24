@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -11,6 +13,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/twistingmercury/heartbeat"
 )
+
+// getEnv returns the value of an environment variable or a default value if not set.
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 func main() {
 	r := gin.Default()
@@ -35,7 +45,7 @@ func main() {
 	}
 
 	// Register the healthcheck endpoint by passing the name of the service
-	r.GET("/health", heartbeat.Handler("example", deps...))
+	r.GET("/health", heartbeat.Handler("testApi", deps...))
 	if err := r.Run(); err != nil {
 		log.Fatal(err)
 	}
@@ -48,7 +58,8 @@ func checkDB() heartbeat.StatusResult {
 		Message: "database is ready",
 	}
 
-	cluster := gocql.NewCluster("127.0.0.1")
+	cassandraHost := getEnv("CASSANDRA_HOST", "127.0.0.1")
+	cluster := gocql.NewCluster(cassandraHost)
 	cluster.Keyspace = "system"
 	cluster.Consistency = gocql.Quorum
 	session, err := cluster.CreateSession()
@@ -73,7 +84,9 @@ func checkRMQ() heartbeat.StatusResult {
 		Timeout: 1 * time.Second,
 	}
 	defer client.CloseIdleConnections()
-	req, err := http.NewRequest("GET", `http://rabbit:password@localhost:15672/api/aliveness-test/%2F`, nil)
+	rabbitmqHost := getEnv("RABBITMQ_HOST", "localhost")
+	rabbitmqURL := fmt.Sprintf("http://rabbit:password@%s:15672/api/aliveness-test/%%2F", rabbitmqHost)
+	req, err := http.NewRequest("GET", rabbitmqURL, nil)
 	if err != nil {
 		return heartbeat.StatusResult{
 			Status:  heartbeat.StatusCritical,

@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Cassandra database for testApi dependency check
+  cassandra:
+    image: cassandra:latest
+    container_name: e2e-cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_USER=cassandra
+      - CASSANDRA_PASSWORD=cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'SELECT release_version FROM system.local' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - e2e-network
+
+  # RabbitMQ for testApi dependency check
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: e2e-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=rabbit
+      - RABBITMQ_DEFAULT_PASS=password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  # The testApi service under test
+  testapi:
+    build:
+      context: ../..
+      dockerfile: tests/testApi/Dockerfile
+    container_name: e2e-testapi
+    ports:
+      - "8080:8080"
+    environment:
+      - CASSANDRA_HOST=cassandra
+      - RABBITMQ_HOST=rabbitmq
+      - GIN_MODE=release
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - e2e-network
+
+  # E2E test runner
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: e2e-tests
+    environment:
+      - TESTAPI_URL=http://testapi:8080
+    depends_on:
+      testapi:
+        condition: service_healthy
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge
