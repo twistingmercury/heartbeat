@@ -1,7 +1,8 @@
 # Heartbeat
 
 > **Maturity Level**: Basic - Ready for production use.
-> panic recovery, and stable API
+>
+> **Version**: v1.0.0
 
 A Go package providing health check functionality with support for HTTP and
 custom dependency monitoring.

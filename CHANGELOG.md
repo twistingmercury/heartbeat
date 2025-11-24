@@ -7,12 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-11-24
+
+### Added
+
+- GitHub Actions CI workflow (.github/workflows/ci.yaml) with Go 1.24/1.25 matrix
+  testing for automated build and test validation
+- GitHub Actions release workflow (.github/workflows/release.yaml) for automated
+  releases on tag push
+- `TestHandlerNameField` test with 6 test cases to verify Name field population
+  in Response struct
+
+### Fixed
+
+- `Name` field in Response struct now correctly populated (was documented but
+  not being set)
+- Go version requirement in README corrected from 1.25+ to 1.24+
+- Custom dependency resource field example in README corrected to show actual
+  populated value
+- Added `NotSet` status to HTTP 200 OK status list in README documentation
+
 ## [0.9.1] - 2025-11-17
 
 ### Added
 
 - Panic recovery for custom handlers prevents single faulty handler from crashing
   the service
+- End-to-end testing for use and functionality from a "consumer's" perspective
 - Comprehensive unit tests for edge cases and race conditions:
   - Context cancellation in Handler, executeHandlerWithTimeout, and checkURL
   - Thread-safe concurrent execution validation (race detector)
