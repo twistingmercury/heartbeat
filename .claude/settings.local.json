@@ -44,7 +44,10 @@
       "Bash(TESTAPI_URL=http://localhost:8080 go test:*)",
       "Bash(make)",
       "Bash(shellcheck:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(make build-docker:*)",
+      "Bash(./tests/e2e/test-runner.sh:*)"
     ],
     "deny": [],
     "ask": [],

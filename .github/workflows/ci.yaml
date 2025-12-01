@@ -13,19 +13,19 @@ jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.24', '1.25']
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Run containerized build
+        run: ./build/build-docker.sh
+
+      - name: Set up Go for E2E tests
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.24'
           cache: true
 
-      - name: Run build script
-        run: ./build/build.sh
+      - name: Run E2E tests
+        run: ./tests/e2e/test-runner.sh run
