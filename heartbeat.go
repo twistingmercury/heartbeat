@@ -82,7 +82,7 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 
 		// Get context from request for cancellation and deadline propagation
 		ctx := c.Request.Context()
-		status, checkedDeps := checkDeps(ctx, deps)
+		status, checkedDeps := CheckDependencies(ctx, deps)
 		hb.Dependencies = checkedDeps
 		hb.Status = status
 
@@ -101,7 +101,7 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 	}
 }
 
-func checkDeps(ctx context.Context, deps []DependencyDescriptor) (status Status, hbl []StatusResult) {
+func CheckDependencies(ctx context.Context, deps []DependencyDescriptor) (status Status, hbl []StatusResult) {
 	// Pre-allocate results slice with known length
 	results := make([]StatusResult, len(deps))
 
