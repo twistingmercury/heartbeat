@@ -1,7 +1,7 @@
 package heartbeat
 
 // CheckDeps is exported for testing
-var CheckDeps = checkDeps
+//var CheckDeps = CheckDependencies
 
 // CheckURL is exported for testing
 var CheckURL = checkURL

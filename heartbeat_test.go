@@ -46,7 +46,7 @@ func TestDependencyHandlerFunc(t *testing.T) {
 	assert.Equal(t, exp, act)
 }
 
-func TestCheckDepsInvokesHandlerFunc(t *testing.T) {
+func TestCheckDependenciesInvokesHandlerFunc(t *testing.T) {
 	exp := heartbeat.StatusResult{
 		Status:          heartbeat.StatusOK,
 		Name:            "Test Func",
@@ -61,7 +61,7 @@ func TestCheckDepsInvokesHandlerFunc(t *testing.T) {
 		{Connection: "", Name: "Test custom", Type: "Custom", HandlerFunc: func() (hsr heartbeat.StatusResult) { return exp }},
 	}
 
-	s, r := heartbeat.CheckDeps(context.Background(), deps)
+	s, r := heartbeat.CheckDependencies(context.Background(), deps)
 	assert.Equal(t, heartbeat.StatusOK, s)
 	assert.Equal(t, 2, len(r))
 }
@@ -720,12 +720,12 @@ func TestHandlerContextCancellation(t *testing.T) {
 			assert.NotEmpty(t, hcr.Resource, "Resource should be set")
 			assert.NotZero(t, hcr.UtcDateTime, "DateTime should be set")
 
-			// For cancelled contexts, verify dependencies reflect the cancellation or timeout
+			// For canceled contexts, verify dependencies reflect the cancellation or timeout
 			if tt.cancelBeforeServe {
 				assert.NotEmpty(t, hcr.Dependencies, "Should have dependency results")
 				for _, dep := range hcr.Dependencies {
 					assert.Equal(t, heartbeat.StatusCritical, dep.Status, "Cancelled dependency should be critical")
-					// Message can be either "cancelled" (for URL checks) or "timeout" (for custom handlers)
+					// Message can be either "canceled" (for URL checks) or "timeout" (for custom handlers)
 					assert.True(t,
 						dep.Message != "" && (dep.Message[:9] == "cancelled" || dep.Message[:7] == "request" || dep.Message[:6] == "custom"),
 						"Message should indicate cancellation or timeout, got: %s", dep.Message)
@@ -889,14 +889,14 @@ func TestHandlerTimeout(t *testing.T) {
 // and don't crash the service. Other dependencies should continue to be checked.
 func TestHandlerPanic(t *testing.T) {
 	tests := []struct {
-		name                  string
-		setupDeps             func() []heartbeat.DependencyDescriptor
-		expectedStatus        heartbeat.Status
-		expectedNumResults    int
-		panicHandlerName      string
-		nonPanicHandlerName   string
-		expectedPanicMessage  string
-		description           string
+		name                 string
+		setupDeps            func() []heartbeat.DependencyDescriptor
+		expectedStatus       heartbeat.Status
+		expectedNumResults   int
+		panicHandlerName     string
+		nonPanicHandlerName  string
+		expectedPanicMessage string
+		description          string
 	}{
 		{
 			name: "single handler panics - service should not crash",
@@ -1053,8 +1053,8 @@ func TestHandlerPanic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			deps := tt.setupDeps()
 
-			// Execute checkDeps - this should NOT crash even if handlers panic
-			status, results := heartbeat.CheckDeps(context.Background(), deps)
+			// Execute CheckDependencies - this should NOT crash even if handlers panic
+			status, results := heartbeat.CheckDependencies(context.Background(), deps)
 
 			// Verify the overall status is critical (due to panic)
 			assert.Equal(t, tt.expectedStatus, status,
@@ -1354,9 +1354,9 @@ func TestHandlerWarning(t *testing.T) {
 	}
 }
 
-// TestCheckDepsRace validates race-free concurrent execution in checkDeps
+// TestCheckDependenciesRace validates race-free concurrent execution in CheckDependencies
 // This test specifically validates the thread-safe status aggregation with mutex (lines 127-132 in heartbeat.go)
-func TestCheckDepsRace(t *testing.T) {
+func TestCheckDependenciesRace(t *testing.T) {
 	tests := []struct {
 		name           string
 		numDeps        int
@@ -1579,10 +1579,10 @@ func TestCheckDepsRace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			deps := tt.setupDeps(t)
 
-			// Execute checkDeps multiple times to increase chance of detecting race conditions
+			// Execute CheckDependencies multiple times to increase chance of detecting race conditions
 			// The race detector will catch issues if any exist
 			for iteration := 0; iteration < 5; iteration++ {
-				status, results := heartbeat.CheckDeps(context.Background(), deps)
+				status, results := heartbeat.CheckDependencies(context.Background(), deps)
 
 				// Verify status aggregation is correct
 				assert.Equal(t, tt.expectedStatus, status,
@@ -1665,12 +1665,12 @@ func TestHandlerMachineField(t *testing.T) {
 // is correctly populated with the svcName parameter passed to Handler.
 func TestHandlerNameField(t *testing.T) {
 	tests := []struct {
-		name            string
-		svcName         string
-		setupDeps       func(t *testing.T) []heartbeat.DependencyDescriptor
-		expectedName    string
+		name             string
+		svcName          string
+		setupDeps        func(t *testing.T) []heartbeat.DependencyDescriptor
+		expectedName     string
 		expectedResource string
-		description     string
+		description      string
 	}{
 		{
 			name:    "service name is set in both Name and Resource fields",
