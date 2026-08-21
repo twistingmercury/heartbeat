@@ -24,7 +24,7 @@ jobs:
       - name: Set up Go for E2E tests
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26.6'
           cache: true
 
       - name: Run E2E tests

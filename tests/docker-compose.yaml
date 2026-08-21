@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   cassandra:
     image: cassandra:latest
@@ -17,8 +15,8 @@ services:
       - RABBITMQ_DEFAULT_USER=rabbit
       - RABBITMQ_DEFAULT_PASS=password
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5692:5672"
+      - "15692:15672"
 
   testapi:
     build:

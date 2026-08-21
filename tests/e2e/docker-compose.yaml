@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   # Cassandra database for testApi dependency check
   cassandra:
     image: cassandra:latest
     container_name: e2e-cassandra
     ports:
-      - "9042:9042"
+      - "9142:9042"
     environment:
       - CASSANDRA_USER=cassandra
       - CASSANDRA_PASSWORD=cassandra
@@ -27,8 +25,8 @@ services:
       - RABBITMQ_DEFAULT_USER=rabbit
       - RABBITMQ_DEFAULT_PASS=password
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5682:5672"
+      - "15682:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -45,7 +43,7 @@ services:
       dockerfile: tests/testApi/Dockerfile
     container_name: e2e-testapi
     ports:
-      - "8080:8080"
+      - "9080:8080"
     environment:
       - CASSANDRA_HOST=cassandra
       - RABBITMQ_HOST=rabbitmq
@@ -56,7 +54,7 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9080/health"]
       interval: 5s
       timeout: 3s
       retries: 5

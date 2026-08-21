@@ -44,7 +44,7 @@ func getBaseURL() string {
 	if url := os.Getenv("TESTAPI_URL"); url != "" {
 		return url
 	}
-	return "http://localhost:8080"
+	return "http://localhost:9080"
 }
 
 // httpClient returns a configured HTTP client for testing.

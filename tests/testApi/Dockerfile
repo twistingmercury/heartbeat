@@ -1,8 +1,10 @@
-FROM golang:1.24-alpine AS builder
-
-RUN apk add --no-cache git ca-certificates tzdata
+FROM ghcr.io/twistingmercury/golang-tooling:latest AS builder
 
 RUN adduser -D -g '' -u 10001 appuser
+
+RUN apk add --no-cache tzdata
+ENV TZ=America/New_York
+RUN cp /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /build
 
