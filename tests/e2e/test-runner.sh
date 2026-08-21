@@ -29,7 +29,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 COMPOSE_FILE="docker-compose.yaml"
-TESTAPI_URL="${TESTAPI_URL:-http://localhost:8080}"
+TESTAPI_URL="${TESTAPI_URL:-http://localhost:9080}"
 MAX_WAIT_SECONDS=180
 HEALTH_CHECK_INTERVAL=5
 

@@ -1,8 +1,8 @@
-go 1.24.0
+go 1.26.6
 
 use (
 	.
 	example
-	tests/testApi
 	tests/e2e
+	tests/testApi
 )

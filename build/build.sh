@@ -8,6 +8,8 @@ PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=../scripts/print.sh
 source "${PROJECT_DIR}/scripts/print.sh"
 
+SKIP_E2E="${SKIP_E2E:-false}"
+
 unit_test() {
 	go mod tidy
 	print::info "running unit tests..."
@@ -33,10 +35,17 @@ e2e_test() {
 	fi
 }
 
- main() {
-  	unit_test && build && e2e_test || return 1
-  	print::info "build completed successfully"
-  	return 0
-  }
+main() {
+	unit_test && build || return 1
+
+	if [ "${SKIP_E2E}" = "true" ]; then
+		print::info "Skipping E2E tests (SKIP_E2E=true)"
+	else
+		e2e_test || return 1
+	fi
+
+	print::info "build completed successfully"
+	return 0
+}
 
 main "$@"

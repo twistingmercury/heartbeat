@@ -1,224 +1,197 @@
 # Heartbeat
 
-> **Maturity Level**: Basic - Ready for production use.
+> **Maturity Level**: Basic - Production-ready and actively evolving.
 >
-> **Version**: v1.0.0
+> **Version**: v1.1.0
 
-A Go package providing health check functionality with support for HTTP and
-custom dependency monitoring.
+Heartbeat is a Go package for exposing Gin-based health endpoints. It checks
+HTTP services and application-defined dependencies, then returns one aggregate
+health response suitable for Kubernetes readiness and liveness probes.
+
+## Table of Contents
+
+- [Usage](#usage)
+- [How it works](#how-it-works)
+- [Key Considerations](#key-considerations)
+- [Development Considerations](#development-considerations)
+- [Versioning](#versioning)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Usage
 
-Import the Heartbeat package in your Go application:
+Install the package:
 
-```go
-import "github.com/twistingmercury/heartbeat"
+```bash
+go get github.com/twistingmercury/heartbeat@v1.1.0
 ```
 
-### Defining Dependencies
-
-Heartbeat allows you to define dependencies that your service relies on. These
-dependencies can be HTTP endpoints or custom handler functions that check the
-status of other remote resources, such as a database, message queue, etc.
-
-#### HTTP Dependencies
-
-Define your HTTP dependencies using the `DependencyDescriptor` struct by
-supplying a URL and a name for each dependency. You can optionally specify a
-timeout duration for the dependency check.
+Define HTTP or custom dependencies and register the handler with Gin:
 
 ```go
-dep01 := heartbeat.DependencyDescriptor{
-    Connection: "https://example.com",
-    Name:       "Example Site",
-    Type:       "Website",
-    Timeout:    5 * time.Second, // Optional: defaults to 10 seconds if not set
+package main
+
+import (
+    "time"
+
+    "github.com/gin-gonic/gin"
+    "github.com/twistingmercury/heartbeat"
+)
+
+func checkDatabase() heartbeat.StatusResult {
+    // Replace this with a real database check.
+    return heartbeat.StatusResult{
+        Status:   heartbeat.StatusOK,
+        Resource: "primary-database",
+        Message:  "database is ready",
+    }
+}
+
+func main() {
+    router := gin.Default()
+
+    dependencies := []heartbeat.DependencyDescriptor{
+        {
+            Name:       "Go website",
+            Type:       "HTTP",
+            Connection: "https://go.dev/",
+            Timeout:    5 * time.Second,
+        },
+        {
+            Name:        "Primary database",
+            Type:        "Database",
+            HandlerFunc: checkDatabase,
+            Timeout:     2 * time.Second,
+        },
+    }
+
+    router.GET("/health", heartbeat.Handler("example-service", dependencies...))
+    _ = router.Run(":8080")
 }
 ```
 
-#### Custom Dependencies
-
-Define custom dependencies using the `DependencyDescriptor` struct by supplying
-a name and a handler function that is of type `heartbeat.StatusHandlerFunc`:
-
-```go
-dep02 := heartbeat.DependencyDescriptor{
-    Name:        "My custom dependency",
-    Type:        "My dependency",
-    HandlerFunc: checkDependency,
-}
-
-func checkDependency() heartbeat.StatusResult {
-    // Check the status of your database connection
-    // Return a StatusResult with the appropriate status and message
-}
-```
-
-> **Important**: While it is possible to define all your custom dependencies in
-a single function, I do not recommend this. It could cause you to possibly lose
-the ability to determine which dependency is causing the issue. I encourage you
-to create a separate func for each dependency checked.
-
-### Registering the Handler
-
-Register the health check endpoint in your application by providing your
-service's name, and by using the `heartbeat.Handler` function. The `Handler`
-function takes the name of your service and a list of dependencies as
-arguments. You can pass as many dependencies as you need. You also provide the
-name of your endpoint, in this example `"/healthcheck"` will be the endpoint
-to call.
-
-```go
-r.GET("/healthcheck", heartbeat.Handler("your-service-name", dep01, dep02))
-```
-
-Run your application and access the health check endpoint at `/healthcheck`.
-
-### Response Format
-
-The health check endpoint returns a JSON response with the following structure:
+Request the endpoint with `curl http://localhost:8080/health`. A successful
+response has this shape:
 
 ```json
 {
   "status": "OK",
-  "name": "your-service-name",
-  "resource": "your-service-name",
+  "name": "example-service",
+  "resource": "example-service",
   "machine": "hostname",
-  "utc_DateTime": "2023-05-08T12:34:56Z",
-  "request_duration_ms": 100,
-  "message": "Service is healthy",
+  "utc_DateTime": "2026-08-21T12:34:56Z",
+  "request_duration_ms": 42.5,
   "dependencies": [
     {
       "status": "OK",
-      "name": "Example Site",
-      "resource": "https://example.com",
-      "request_duration_ms": 50,
+      "name": "Go website",
+      "resource": "https://go.dev/",
+      "request_duration_ms": 42.1,
       "http_status_code": 200,
       "message": "ok"
     },
     {
       "status": "OK",
-      "name": "My custom dependency",
-      "resource": "My custom dependency",
-      "request_duration_ms": 20,
+      "name": "Primary database",
+      "resource": "primary-database",
+      "request_duration_ms": 0,
       "http_status_code": 0,
-      "message": "My custom dependency is healthy"
+      "message": "database is ready"
     }
   ]
 }
 ```
 
-The response includes the overall status of your application, along with the
-status of each defined dependency.
-
-### Health Status Values
-
-The Heartbeat package defines the following health statuses:
-
-- `NotSet`: The status has not been set.
-- `OK`: The dependency is healthy.
-- `Warning`: The dependency is experiencing issues but is still functioning.
-- `Critical`: The dependency is not functioning properly.
-
-### HTTP Status Codes
-
-The HTTP status code of the response is determined by the overall health status:
-
-- `200 OK`: When the overall status is `NotSet`, `OK`, or `Warning`
-- `503 Service Unavailable`: When the overall status is `Critical`
-
-For HTTP dependencies, the `http_status_code` field contains the actual HTTP
-status code returned by the dependency. For custom dependencies, this field is
-set to `0`.
+See the [example application](example/readme.md) for Cassandra and RabbitMQ
+dependency checks.
 
 ## How it works
 
-Heartbeat provides a simple HTTP handler that aggregates health status from
-multiple dependencies. When the health check endpoint is called, it evaluates
-all registered dependencies in parallel, each with its own timeout protection.
-HTTP dependencies are checked by making requests to their configured URLs,
-while custom dependencies execute user-provided handler functions. The overall
-service health is determined by the most severe status among all dependencies.
+`heartbeat.Handler` runs all dependency checks concurrently while preserving
+their declaration order in the response. HTTP checks inherit the request
+context. Custom handlers run with timeout protection and panic recovery. The
+most severe dependency status becomes the aggregate status:
 
-Custom handler functions are protected with automatic panic recovery to prevent
-crashes from unexpected errors in user code. Context cancellation and timeout
-handling ensure that checks respect configured time limits and respond properly
-to cancelled requests.
+| Status | Meaning | Endpoint HTTP status |
+| --- | --- | --- |
+| `NotSet` | No dependency established a status | 200 |
+| `OK` | Healthy | 200 |
+| `Warning` | Degraded but operational | 200 |
+| `Critical` | Unhealthy | 503 |
 
-The package uses Go's standard HTTP client for HTTP dependencies and supports
-both synchronous and asynchronous health checks. Response times are measured
-for each dependency to help identify performance issues.
+HTTP dependency responses are classified as follows: 2xx is `OK`, 3xx is
+`Warning`, and 4xx or 5xx is `Critical`. A successful response slower than
+three seconds is also `Warning`. The standard Go client follows redirects, so
+classification normally uses the final response.
 
 ## Key Considerations
 
-- **Kubernetes Integration**: This package is designed to work as an HTTP
-  [readiness and liveness probe](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#http-probes)
-  for Kubernetes deployments
-- **Timeout Protection**: All HTTP dependency checks have configurable timeouts
-  (defaults to 10 seconds) to prevent hanging connections
-- **TLS Support**: HTTPS endpoints are fully supported for secure communication
-  with dependencies
-- **Custom Dependency Isolation**: Create separate handler functions for each
-  custom dependency to maintain clear error attribution and easier
-  troubleshooting
+- The default dependency timeout is 10 seconds. Set `Timeout` on each
+  descriptor when a shorter limit is appropriate.
+- HTTP dependencies accept only `http` and `https` URLs.
+- A custom handler has no context parameter. Heartbeat can return when its
+  timeout expires, but it cannot stop the handler goroutine; custom checks
+  should therefore enforce cancellation in their own I/O operations.
+- Panics in custom handlers are converted to `Critical` results instead of
+  crashing the health endpoint.
+- Use one custom handler per dependency so failures remain attributable.
+- `Warning` deliberately returns HTTP 200. Use `Critical` when an orchestrator
+  should remove the instance from service.
 
 ## Development Considerations
 
 ### Quick Start
 
-Requires Go 1.24+ - [Installation instructions](https://golang.org/doc/install)
-
-Clone the repository:
+The root module requires Go 1.26.6 or newer. Docker is required for
+`make build-docker`; Docker with the Compose plugin is required for E2E commands.
 
 ```bash
 git clone https://github.com/twistingmercury/heartbeat.git
 cd heartbeat
-```
-
-### Building & running
-
-Build the package:
-
-```bash
-go build
-```
-
-To run the example application:
-
-```bash
-cd example
-go run main.go
-```
-
-The example requires Docker and Docker Compose if you want to test with
-containerized dependencies.
-
-### Testing
-
-Run the test suite:
-
-```bash
+go mod download
 go test ./...
 ```
 
-Run tests with coverage:
+Useful project commands:
+
+| Command | Purpose |
+| --- | --- |
+| `make test` | Run root unit tests and open an HTML coverage report |
+| `make build` | Run unit tests, build the root package, and run E2E tests |
+| `make build-docker` | Run unit tests and builds in the project build image |
+| `make e2e-run` | Start dependencies, run E2E tests, and clean up |
+| `make e2e-up` / `make e2e-down` | Manage the E2E environment manually |
+| `make e2e-test` | Run E2E tests against manually started infrastructure |
+| `make e2e-logs` / `make e2e-clean` | Inspect E2E logs or forcibly remove E2E resources |
+
+Run the race detector directly when changing concurrent dependency handling:
 
 ```bash
-go test -cover ./...
+go test -race ./...
 ```
+
+### Testing
+
+Unit tests use local HTTP test servers and require no external services. E2E
+tests start Cassandra, RabbitMQ, and a consumer API with Docker Compose; initial
+image pulls and Cassandra startup can take several minutes.
 
 ### Versioning
 
-This project uses git tag-based versioning following semantic versioning
-principles. Release tags follow the format `vX.Y.Z` (e.g., `v1.2.3`).
+This project follows [Semantic Versioning 2.0.0](https://semver.org/).
+Version is determined from Git tags:
+
+```bash
+git describe --tags --always
+```
+
+Release history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Contributions to the Heartbeat package are welcome! If you find any issues or
-have suggestions for improvements, please open an issue or submit a pull
-request on the
+Issues and pull requests are welcome in the
 [GitHub repository](https://github.com/twistingmercury/heartbeat).
 
 ## License
 
-The Heartbeat package is open-source software released under the [MIT License](LICENSE).
+Heartbeat is available under the [MIT License](LICENSE).

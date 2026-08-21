@@ -1,4 +1,4 @@
-.PHONY: build test e2e-up e2e-down e2e-test e2e-run e2e-logs e2e-clean help
+.PHONY: build build-docker test e2e-up e2e-down e2e-test e2e-run e2e-logs e2e-clean help
 
 default: help
 
@@ -8,6 +8,9 @@ help: ## Show this help
 
 build: ## Run the full build process; unit tests, build, e2e tests
 	./build/build.sh
+
+build-docker: ## Run unit tests and build inside Docker container
+	./build/build-docker.sh
 
 test: ## Run unit tests with coverage report
 	go clean -testcache
