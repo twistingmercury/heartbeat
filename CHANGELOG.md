@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-21
+
+### Added
+
+- Docker-first build support through `build/Dockerfile`,
+  `build/build-docker.sh`, and the `make build-docker` target
+- `SKIP_E2E` support in the build script for containerized unit-test and build
+  runs
+
+### Changed
+
+- Root module and workspace Go directives updated to Go 1.26.6
+- Root-module runtime and test dependencies updated, including Gin 1.12.0
+- CI now runs the build in Docker and executes E2E tests separately with Go
+  1.26.6
+- E2E host ports moved to `9080`, `9142`, `5682`, and `15682` to reduce
+  clashes with local services
+- The E2E test API image now builds with the shared Go tooling image and runs
+  as a non-root user
+
+### Removed
+
+- The exported `CheckDependencies` helper introduced in v1.0.1; dependency
+  aggregation is internal again and consumers should use `Handler`
+- The tag-driven GitHub release workflow
+
+## [1.0.1] - 2026-01-28
+
+### Added
+
+- Exported `CheckDependencies` so callers could aggregate dependency results
+  without the Gin handler
+
+### Changed
+
+- GitHub release publishing switched to the GitHub CLI and a release token
+
 ## [1.0.0] - 2025-11-24
 
 ### Added

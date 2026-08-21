@@ -1,6 +1,4 @@
-FROM golang:1.24-alpine
-
-RUN apk add --no-cache git bash
+FROM ghcr.io/twistingmercury/golang-tooling:latest
 
 WORKDIR /workspace
 
