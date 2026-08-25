@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Consolidated build and E2E validation into the Docker-first `make build`
+  workflow. It runs quality gates and race tests in the build image, starts
+  health-gated Cassandra, RabbitMQ, and test API services with Docker Compose,
+  runs the E2E test container, and cleans up the Compose resources afterward.
+- CI now uses the same Docker-first build path instead of setting up Go and
+  orchestrating E2E tests separately on the host.
+- Updated the E2E Compose topology with service readiness checks, internal
+  service networking, and a dedicated E2E test-runner container.
+
+### Removed
+
+- The former split Docker build and host-orchestrated E2E workflow, including
+  the legacy E2E Compose definition.
+
 ## [1.1.0] - 2026-08-21
 
 ### Added
