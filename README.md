@@ -2,7 +2,7 @@
 
 > **Maturity Level**: Basic - Production-ready and actively evolving.
 >
-> **Version**: v1.1.0
+> **Version**: v1.1.1
 
 Heartbeat is a Go package for exposing Gin-based health endpoints. It checks
 HTTP services and application-defined dependencies, then returns one aggregate
