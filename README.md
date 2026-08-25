@@ -142,27 +142,22 @@ classification normally uses the final response.
 
 ### Quick Start
 
-The root module requires Go 1.26.6 or newer. Docker is required for
-`make build-docker`; Docker with the Compose plugin is required for E2E commands.
+The root module requires Go 1.27.0 or newer for host-based development.
+The standard build is Docker-first: install Docker with the Compose plugin to
+run the complete validation suite without a host Go toolchain.
 
 ```bash
 git clone https://github.com/twistingmercury/heartbeat.git
 cd heartbeat
-go mod download
-go test ./...
+make build
 ```
 
 Useful project commands:
 
 | Command | Purpose |
 | --- | --- |
-| `make test` | Run root unit tests and open an HTML coverage report |
-| `make build` | Run unit tests, build the root package, and run E2E tests |
-| `make build-docker` | Run unit tests and builds in the project build image |
-| `make e2e-run` | Start dependencies, run E2E tests, and clean up |
-| `make e2e-up` / `make e2e-down` | Manage the E2E environment manually |
-| `make e2e-test` | Run E2E tests against manually started infrastructure |
-| `make e2e-logs` / `make e2e-clean` | Inspect E2E logs or forcibly remove E2E resources |
+| `make build` | Run the Docker-first quality gates, race tests, build, health-gated E2E tests, and cleanup |
+| `make test` | Run host-based static analysis and root unit tests with an HTML coverage report |
 
 Run the race detector directly when changing concurrent dependency handling:
 
@@ -172,9 +167,19 @@ go test -race ./...
 
 ### Testing
 
-Unit tests use local HTTP test servers and require no external services. E2E
-tests start Cassandra, RabbitMQ, and a consumer API with Docker Compose; initial
-image pulls and Cassandra startup can take several minutes.
+`make build` builds the root package in the project build image, then uses
+Docker Compose to start Cassandra, RabbitMQ, and the consumer API. It waits for
+each service's health check before running the E2E test container, propagates
+the test result, and removes the Compose resources afterward. GitHub Actions
+uses this same Docker-first build path. Initial image pulls and Cassandra startup
+can take several minutes.
+
+Host-based unit tests use local HTTP test servers and require no external
+services:
+
+```bash
+go test ./...
+```
 
 ### Versioning
 

@@ -9,28 +9,17 @@ help: ## Show this help
 build: ## Run the full build process; unit tests, build, e2e tests
 	./build/build.sh
 
-build-docker: ## Run unit tests and build inside Docker container
-	./build/build-docker.sh
+analyze: ## Run linters, formatters, security scanners, etc
+	go vet ./...
+	goimports -w .
+	golangci-lint run
+	govulncheck ./...
+	gosec -quiet -exclude-dir=tests ./...
 
-test: ## Run unit tests with coverage report
+
+test: analyze ## Run unit tests with coverage report
 	go clean -testcache
 	go test . -v -coverprofile=coverage.out
 	go tool cover -html=coverage.out
 
-e2e-up: ## Start E2E test infrastructure
-	@./tests/e2e/test-runner.sh up
 
-e2e-down: ## Stop E2E test infrastructure
-	@./tests/e2e/test-runner.sh down
-
-e2e-test: ## Run E2E tests (requires e2e-up first)
-	@./tests/e2e/test-runner.sh test
-
-e2e-run: ## Full E2E cycle: start, test, cleanup
-	@./tests/e2e/test-runner.sh run
-
-e2e-logs: ## Show E2E service logs
-	@./tests/e2e/test-runner.sh logs
-
-e2e-clean: ## Force cleanup E2E Docker resources
-	cd tests/e2e && docker compose down -v --remove-orphans 2>/dev/null || true

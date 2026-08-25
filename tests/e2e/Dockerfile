@@ -1,12 +1,9 @@
-FROM golang:1.24-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.0 AS builder
 
 WORKDIR /app
 
 # Copy go.mod and download dependencies
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy test files

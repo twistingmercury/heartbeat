@@ -889,14 +889,14 @@ func TestHandlerTimeout(t *testing.T) {
 // and don't crash the service. Other dependencies should continue to be checked.
 func TestHandlerPanic(t *testing.T) {
 	tests := []struct {
-		name                  string
-		setupDeps             func() []heartbeat.DependencyDescriptor
-		expectedStatus        heartbeat.Status
-		expectedNumResults    int
-		panicHandlerName      string
-		nonPanicHandlerName   string
-		expectedPanicMessage  string
-		description           string
+		name                 string
+		setupDeps            func() []heartbeat.DependencyDescriptor
+		expectedStatus       heartbeat.Status
+		expectedNumResults   int
+		panicHandlerName     string
+		nonPanicHandlerName  string
+		expectedPanicMessage string
+		description          string
 	}{
 		{
 			name: "single handler panics - service should not crash",
@@ -1665,12 +1665,12 @@ func TestHandlerMachineField(t *testing.T) {
 // is correctly populated with the svcName parameter passed to Handler.
 func TestHandlerNameField(t *testing.T) {
 	tests := []struct {
-		name            string
-		svcName         string
-		setupDeps       func(t *testing.T) []heartbeat.DependencyDescriptor
-		expectedName    string
+		name             string
+		svcName          string
+		setupDeps        func(t *testing.T) []heartbeat.DependencyDescriptor
+		expectedName     string
 		expectedResource string
-		description     string
+		description      string
 	}{
 		{
 			name:    "service name is set in both Name and Resource fields",

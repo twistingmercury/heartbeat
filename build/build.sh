@@ -1,51 +1,48 @@
 #!/usr/bin/env bash
 
-set -e
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
-# shellcheck source=../scripts/print.sh
 source "${PROJECT_DIR}/scripts/print.sh"
 
-SKIP_E2E="${SKIP_E2E:-false}"
+IMAGE_NAME="heartbeat-build:latest"
+IS_LOCAL="${IS_LOCAL:-0}"
+COMPOSE_FILE="${PROJECT_DIR}/tests/docker-compose.yaml"
 
-unit_test() {
-	go mod tidy
-	print::info "running unit tests..."
-	if ! go test -v "${PROJECT_DIR}/..."; then
-		print::error "unit tests failed"
-		return 1
-	fi
+cleanup() {
+    local exit_status=$?
+    local cleanup_status=0
+
+    docker compose -f "${COMPOSE_FILE}" down --volumes --remove-orphans || cleanup_status=$?
+
+    if [[ "${IS_LOCAL}" == "0" ]]; then
+        docker image rm "${IMAGE_NAME}" >/dev/null 2>&1 || true
+        docker network rm tests_e2e_network >/dev/null 2>&1 || true
+    fi
+
+    if [[ "${exit_status}" -eq 0 && "${cleanup_status}" -ne 0 ]]; then
+        exit_status="${cleanup_status}"
+    fi
+
+
+
+    exit "${exit_status}"
 }
 
-build() {
-	print::info "building package..."
-	if ! go build ./...; then
-		print::error "build failed"
-		return 1
-	fi
+trap cleanup EXIT
+
+build(){
+    docker build -t "${IMAGE_NAME}" -f "${SCRIPT_DIR}/Dockerfile" "${PROJECT_DIR}"
 }
 
-e2e_test() {
-	print::info "running end-to-end tests..."
-	if ! "${PROJECT_DIR}/tests/e2e/test-runner.sh" run; then
-		print::error "e2e tests failed"
-		return 1
-	fi
+test(){
+    docker compose -f "${COMPOSE_FILE}" up --build --abort-on-container-exit --exit-code-from e2e_tests
 }
 
-main() {
-	unit_test && build || return 1
-
-	if [ "${SKIP_E2E}" = "true" ]; then
-		print::info "Skipping E2E tests (SKIP_E2E=true)"
-	else
-		e2e_test || return 1
-	fi
-
-	print::info "build completed successfully"
-	return 0
+main(){
+    build
+    test
 }
 
 main "$@"
