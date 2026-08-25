@@ -18,6 +18,8 @@ cleanup() {
 
     if [[ "${IS_LOCAL}" == "0" ]]; then
         docker image rm "${IMAGE_NAME}" >/dev/null 2>&1 || true
+        docker image rm tests-e2e_tests:latest >/dev/null 2>&1 || true
+        docker image rm tests-testapi:latest >/dev/null 2>&1 || true
         docker network rm tests_e2e_network >/dev/null 2>&1 || true
     fi
 
