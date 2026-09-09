@@ -5,7 +5,7 @@ RabbitMQ checks. It exposes Heartbeat through Gin at `GET /health`.
 
 ## Prerequisites
 
-- Go 1.26.6 or newer when running from this repository's workspace
+- Go 1.27.1 or newer when running from this repository's workspace
 - Docker with the Compose plugin
 
 ## Run the Example
