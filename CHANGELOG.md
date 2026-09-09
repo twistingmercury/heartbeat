@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated all modules, the workspace, and containerized build tooling to Go
+  1.27.1.
 - Consolidated build and E2E validation into the Docker-first `make build`
   workflow. It runs quality gates and race tests in the build image, starts
   health-gated Cassandra, RabbitMQ, and test API services with Docker Compose,

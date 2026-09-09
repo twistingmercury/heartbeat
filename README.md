@@ -142,7 +142,7 @@ classification normally uses the final response.
 
 ### Quick Start
 
-The root module requires Go 1.27.0 or newer for host-based development.
+The root module requires Go 1.27.1 or newer for host-based development.
 The standard build is Docker-first: install Docker with the Compose plugin to
 run the complete validation suite without a host Go toolchain.
 
