@@ -2,7 +2,7 @@
 
 > **Maturity Level**: Basic - Production-ready and actively evolving.
 >
-> **Version**: v1.1.1
+> **Version**: v1.1.2
 
 Heartbeat is a Go package for exposing Gin-based health endpoints. It checks
 HTTP services and application-defined dependencies, then returns one aggregate
@@ -23,7 +23,7 @@ health response suitable for Kubernetes readiness and liveness probes.
 Install the package:
 
 ```bash
-go get github.com/twistingmercury/heartbeat@v1.1.0
+go get github.com/twistingmercury/heartbeat@v1.1.2
 ```
 
 Define HTTP or custom dependencies and register the handler with Gin:
@@ -102,7 +102,7 @@ response has this shape:
 }
 ```
 
-See the [example application](example/readme.md) for Cassandra and RabbitMQ
+See the [example application](example/README.md) for Cassandra and RabbitMQ
 dependency checks.
 
 ## How it works
