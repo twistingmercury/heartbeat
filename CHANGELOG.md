@@ -1,5 +1,7 @@
 # Changelog
 
+<!-- markdownlint-disable MD024 -->
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
@@ -7,10 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-09
+
 ### Changed
 
 - Updated all modules, the workspace, and containerized build tooling to Go
   1.27.1.
+- Updated runtime and test dependencies, including Testify 1.12.1, MongoDB Go
+  Driver 2.9.0, and QUIC-Go 0.62.0.
+
+## [1.1.1] - 2026-08-25
+
+### Changed
+
 - Consolidated build and E2E validation into the Docker-first `make build`
   workflow. It runs quality gates and race tests in the build image, starts
   health-gated Cassandra, RabbitMQ, and test API services with Docker Compose,
