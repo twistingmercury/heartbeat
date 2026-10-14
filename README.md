@@ -2,7 +2,7 @@
 
 > **Maturity Level**: Basic - Production-ready and actively evolving.
 >
-> **Version**: v1.1.2
+> **Version**: v1.2.0
 
 Heartbeat is a Go package for exposing Gin-based health endpoints. It checks
 HTTP services and application-defined dependencies, then returns one aggregate
@@ -14,7 +14,9 @@ health response suitable for Kubernetes readiness and liveness probes.
 - [How it works](#how-it-works)
 - [Key Considerations](#key-considerations)
 - [Development Considerations](#development-considerations)
-- [Versioning](#versioning)
+  - [Quick Start](#quick-start)
+  - [Testing](#testing)
+  - [Versioning](#versioning)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -23,7 +25,7 @@ health response suitable for Kubernetes readiness and liveness probes.
 Install the package:
 
 ```bash
-go get github.com/twistingmercury/heartbeat@v1.1.2
+go get github.com/twistingmercury/heartbeat@v1.2.0
 ```
 
 Define HTTP or custom dependencies and register the handler with Gin:
@@ -59,8 +61,8 @@ func main() {
             Timeout:    5 * time.Second,
         },
         {
-            Name:        "Primary database",
-            Type:        "Database",
+            Name:      "Primary database",
+            Type:      "Database",
             CheckFunc: checkDatabase,
             Timeout:   2 * time.Second,
         },
@@ -103,6 +105,17 @@ response has this shape:
 }
 ```
 
+To serve the result from something other than Gin, call
+`heartbeat.CheckDependencies` directly. It runs the same concurrent, fail-closed
+checks and returns the aggregate status with the per-dependency results in
+declaration order. Unlike `Handler`, it reports a misconfigured descriptor as
+`Critical` instead of panicking, and it does not share runs between concurrent
+callers, so avoid calling it once per incoming probe:
+
+```go
+status, results := heartbeat.CheckDependencies(ctx, dependencies)
+```
+
 See the [example application](example/README.md) for Cassandra and RabbitMQ
 dependency checks.
 
@@ -143,7 +156,7 @@ response.
   `Connection`.
 - Responses never include URL credentials, transport addresses or panic
   values. Panics are logged with `log/slog` and reported as `Critical`.
-- Use one custom handler per dependency so failures remain attributable.
+- Use one custom check per dependency so failures remain attributable.
 - `Warning` deliberately returns HTTP 200. Use `Critical` when an orchestrator
   should remove the instance from service.
 
@@ -151,7 +164,8 @@ response.
 
 ### Quick Start
 
-The root module supports Go 1.26 or newer and builds with the Go 1.27.2 toolchain, which is also what the build images use.
+The root module supports Go 1.26 or newer and builds with the Go 1.27.2
+toolchain, which is also what the build images use.
 The standard build is Docker-first: install Docker with the Compose plugin to
 run the complete validation suite without a host Go toolchain.
 
@@ -166,7 +180,11 @@ Useful project commands:
 | Command | Purpose |
 | --- | --- |
 | `make build` | Run the Docker-first quality gates, race tests, build, health-gated E2E tests, and cleanup |
-| `make test` | Run host-based static analysis and root unit tests with the race detector and a coverage summary |
+| `make analyze` | Run `go vet`, the `goimports` format check, `golangci-lint`, `govulncheck` and `gosec` on the host without modifying files |
+| `make test` | Run `make analyze`, then the root unit tests with the race detector and a coverage summary |
+
+`make analyze` and `make test` need those tools installed on the host;
+`make build` needs only Docker.
 
 Run the race detector directly when changing concurrent dependency handling:
 
