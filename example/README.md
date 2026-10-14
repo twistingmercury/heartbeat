@@ -49,16 +49,15 @@ more before its check becomes healthy.
 ## Customize the Example
 
 Edit the dependency descriptors or handler functions in [main.go](main.go).
-Each handler returns a `heartbeat.StatusResult`; keep checks bounded with client
-or driver timeouts so they cannot continue indefinitely after Heartbeat's
-wrapper timeout expires.
+Each `CheckFunc` returns a `heartbeat.StatusResult`. Pass its context to your
+client or driver calls so the check stops when Heartbeat's timeout expires.
 
 For an entirely containerized consumer test, use the repository's E2E harness
 instead:
 
 ```bash
 cd ..
-make e2e-run
+make build
 ```
 
 ## License

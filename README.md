@@ -32,14 +32,15 @@ Define HTTP or custom dependencies and register the handler with Gin:
 package main
 
 import (
+    "context"
     "time"
 
     "github.com/gin-gonic/gin"
     "github.com/twistingmercury/heartbeat"
 )
 
-func checkDatabase() heartbeat.StatusResult {
-    // Replace this with a real database check.
+func checkDatabase(ctx context.Context) heartbeat.StatusResult {
+    // Replace this with a real database check that honors ctx.
     return heartbeat.StatusResult{
         Status:   heartbeat.StatusOK,
         Resource: "primary-database",
@@ -60,8 +61,8 @@ func main() {
         {
             Name:        "Primary database",
             Type:        "Database",
-            HandlerFunc: checkDatabase,
-            Timeout:     2 * time.Second,
+            CheckFunc: checkDatabase,
+            Timeout:   2 * time.Second,
         },
     }
 
@@ -94,7 +95,7 @@ response has this shape:
       "status": "OK",
       "name": "Primary database",
       "resource": "primary-database",
-      "request_duration_ms": 0,
+      "request_duration_ms": 0.4,
       "http_status_code": 0,
       "message": "database is ready"
     }
@@ -108,32 +109,40 @@ dependency checks.
 ## How it works
 
 `heartbeat.Handler` runs all dependency checks concurrently while preserving
-their declaration order in the response. HTTP checks inherit the request
-context. Custom handlers run with timeout protection and panic recovery. The
-most severe dependency status becomes the aggregate status:
+their declaration order in the response. Custom checks run with timeout
+protection and panic recovery. Concurrent requests share one run of the checks,
+so a burst of probes makes one call to each dependency rather than one per
+request. The most severe dependency status becomes the aggregate status:
 
 | Status | Meaning | Endpoint HTTP status |
 | --- | --- | --- |
-| `NotSet` | No dependency established a status | 200 |
-| `OK` | Healthy | 200 |
+| `OK` | Healthy, or no dependencies are configured | 200 |
 | `Warning` | Degraded but operational | 200 |
 | `Critical` | Unhealthy | 503 |
 
+The health check fails closed. A custom check that returns `NotSet` (the zero
+value) or any value outside this table is reported as `Critical`.
+
 HTTP dependency responses are classified as follows: 2xx is `OK`, 3xx is
 `Warning`, and 4xx or 5xx is `Critical`. A successful response slower than
-three seconds is also `Warning`. The standard Go client follows redirects, so
-classification normally uses the final response.
+three seconds (or the descriptor's `SlowThreshold`) is also `Warning`. The
+standard Go client follows redirects, so classification normally uses the final
+response.
 
 ## Key Considerations
 
 - The default dependency timeout is 10 seconds. Set `Timeout` on each
   descriptor when a shorter limit is appropriate.
-- HTTP dependencies accept only `http` and `https` URLs.
-- A custom handler has no context parameter. Heartbeat can return when its
-  timeout expires, but it cannot stop the handler goroutine; custom checks
-  should therefore enforce cancellation in their own I/O operations.
-- Panics in custom handlers are converted to `Critical` results instead of
-  crashing the health endpoint.
+- `Handler` panics at startup if a descriptor has nothing to check, an invalid
+  or non-HTTP URL, or a negative duration. HTTP dependencies accept only
+  absolute `http` and `https` URLs.
+- Use `CheckFunc` for custom checks and pass its context to your I/O so the
+  check stops when its timeout expires. The older `HandlerFunc` is deprecated:
+  it has no context, so a hung handler keeps its goroutine after the timeout.
+  If both are set, `CheckFunc` wins, and either one takes precedence over
+  `Connection`.
+- Responses never include URL credentials, transport addresses or panic
+  values. Panics are logged with `log/slog` and reported as `Critical`.
 - Use one custom handler per dependency so failures remain attributable.
 - `Warning` deliberately returns HTTP 200. Use `Critical` when an orchestrator
   should remove the instance from service.
@@ -142,7 +151,7 @@ classification normally uses the final response.
 
 ### Quick Start
 
-The root module requires Go 1.27.1 or newer for host-based development.
+The root module requires Go 1.26 or newer. The build image uses Go 1.27.1.
 The standard build is Docker-first: install Docker with the Compose plugin to
 run the complete validation suite without a host Go toolchain.
 
@@ -157,7 +166,7 @@ Useful project commands:
 | Command | Purpose |
 | --- | --- |
 | `make build` | Run the Docker-first quality gates, race tests, build, health-gated E2E tests, and cleanup |
-| `make test` | Run host-based static analysis and root unit tests with an HTML coverage report |
+| `make test` | Run host-based static analysis and root unit tests with the race detector and a coverage summary |
 
 Run the race detector directly when changing concurrent dependency handling:
 

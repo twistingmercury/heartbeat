@@ -1,8 +1,6 @@
-version: '3'
-
 services:
   cassandra:
-    image: cassandra:latest
+    image: cassandra:5.0
     container_name: cassandra-container
     ports:
       - "9042:9042"
@@ -11,7 +9,7 @@ services:
       - CASSANDRA_PASSWORD=cassandra
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:3.13-management-alpine
     container_name: 'rabbitmq'
     environment:
       - RABBITMQ_DEFAULT_USER=rabbit

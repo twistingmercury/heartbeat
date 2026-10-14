@@ -1,10 +1,22 @@
 package heartbeat
 
-// CheckDeps is exported for testing
-//var CheckDeps = CheckDependencies
+import (
+	"context"
+	"time"
+)
 
-// CheckURL is exported for testing
-var CheckURL = checkURL
+// CheckURL is exported for testing. It uses the default slow threshold.
+func CheckURL(ctx context.Context, urlStr string, timeout time.Duration) StatusResult {
+	return checkURL(ctx, urlStr, timeout, 0)
+}
 
-// ExecuteHandlerWithTimeout is exported for testing
-var ExecuteHandlerWithTimeout = executeHandlerWithTimeout
+// CheckURLWithSlowThreshold is exported for testing.
+var CheckURLWithSlowThreshold = checkURL
+
+// ExecuteHandlerWithTimeout is exported for testing.
+func ExecuteHandlerWithTimeout(ctx context.Context, handler StatusHandlerFunc, timeout time.Duration) StatusResult {
+	return runCheck(ctx, func(context.Context) StatusResult { return handler() }, timeout)
+}
+
+// RunCheck is exported for testing.
+var RunCheck = runCheck

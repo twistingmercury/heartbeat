@@ -1,4 +1,4 @@
-.PHONY: build build-docker test e2e-up e2e-down e2e-test e2e-run e2e-logs e2e-clean help
+.PHONY: build analyze test help
 
 default: help
 
@@ -9,17 +9,14 @@ help: ## Show this help
 build: ## Run the full build process; unit tests, build, e2e tests
 	./build/build.sh
 
-analyze: ## Run linters, formatters, security scanners, etc
+analyze: ## Run linters, format check, security scanners (does not modify files)
 	go vet ./...
-	goimports -w .
+	@test -z "$$(goimports -l .)" || (echo "goimports: these files need formatting:"; goimports -l .; exit 1)
 	golangci-lint run
 	govulncheck ./...
 	gosec -quiet -exclude-dir=tests ./...
 
-
-test: analyze ## Run unit tests with coverage report
+test: analyze ## Run unit tests with the race detector and print coverage
 	go clean -testcache
-	go test . -v -coverprofile=coverage.out
-	go tool cover -html=coverage.out
-
-
+	CGO_ENABLED=1 go test . -race -v -coverprofile=coverage.out
+	go tool cover -func=coverage.out

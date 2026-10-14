@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,11 +16,18 @@ import (
 	"github.com/twistingmercury/heartbeat"
 )
 
+// slowDelay and slowThreshold let tests exercise slow-response warnings
+// without waiting for the three-second default threshold.
+const (
+	slowDelay     = 150 * time.Millisecond
+	slowThreshold = 50 * time.Millisecond
+)
+
 func testServer(status int, delay bool) *httptest.Server {
 	return httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if delay {
-				time.Sleep(4 * time.Second)
+				time.Sleep(slowDelay)
 			}
 			w.WriteHeader(status)
 			_, err := fmt.Fprintln(w, "Hello, client")
@@ -83,7 +91,7 @@ func TestCheckUrlReturnWarning(t *testing.T) {
 	ts := testServer(200, true)
 	defer ts.Close()
 
-	act := heartbeat.CheckURL(context.Background(), ts.URL, 10*time.Second)
+	act := heartbeat.CheckURLWithSlowThreshold(context.Background(), ts.URL, 10*time.Second, slowThreshold)
 	assert.Equal(t, heartbeat.StatusWarning, act.Status)
 }
 
@@ -346,8 +354,8 @@ func TestExecuteHandlerWithTimeoutContextCancellation(t *testing.T) {
 			},
 			timeout:             500 * time.Millisecond,
 			expectedStatus:      heartbeat.StatusCritical,
-			expectedMessagePart: "custom handler timeout",
-			description:         "When parent context is cancelled, should return critical status with timeout message",
+			expectedMessagePart: "check cancelled",
+			description:         "When parent context is cancelled, should return critical status with cancellation message",
 		},
 		{
 			name: "timeout expires before handler completes",
@@ -447,8 +455,8 @@ func TestExecuteHandlerWithTimeoutContextCancellation(t *testing.T) {
 			},
 			timeout:             500 * time.Millisecond,
 			expectedStatus:      heartbeat.StatusCritical,
-			expectedMessagePart: "custom handler timeout",
-			description:         "When context is cancelled immediately, should return timeout even with generous timeout",
+			expectedMessagePart: "check cancelled",
+			description:         "When context is cancelled immediately, should report cancellation rather than a timeout",
 		},
 	}
 
@@ -486,12 +494,6 @@ func TestExecuteHandlerWithTimeoutContextCancellation(t *testing.T) {
 			assert.Contains(t, result.Message, tt.expectedMessagePart,
 				"Test case: %s - Message should contain '%s', got: '%s'",
 				tt.description, tt.expectedMessagePart, result.Message)
-
-			// Additional verification for timeout cases
-			if tt.expectedStatus == heartbeat.StatusCritical {
-				assert.Contains(t, result.Message, "timeout",
-					"Critical status should indicate timeout")
-			}
 		})
 	}
 }
@@ -630,7 +632,7 @@ func TestHandlerContextCancellation(t *testing.T) {
 			setupDeps: func() []heartbeat.DependencyDescriptor {
 				// Create a slow server that will be interrupted by cancellation
 				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					time.Sleep(2 * time.Second) // Slow response
+					time.Sleep(300 * time.Millisecond) // Slow response
 					w.WriteHeader(http.StatusOK)
 				}))
 				t.Cleanup(ts.Close)
@@ -706,31 +708,27 @@ func TestHandlerContextCancellation(t *testing.T) {
 			c.Request = req
 
 			// Serve the request
+			start := time.Now()
 			r.ServeHTTP(resp, c.Request)
+			elapsed := time.Since(start)
 
 			// Verify response
 			assert.Equal(t, tt.expectedHTTPCode, resp.Code, "HTTP status code mismatch")
+
+			// A caller that has gone away gets no body, and the handler must not
+			// wait for the slow dependencies before returning.
+			if tt.cancelBeforeServe {
+				assert.Empty(t, resp.Body.Bytes(), "Cancelled request should not get a body")
+				assert.Less(t, elapsed, time.Second, "Cancelled request should return without waiting for checks")
+				return
+			}
 
 			var hcr heartbeat.Response
 			err := json.Unmarshal(resp.Body.Bytes(), &hcr)
 			assert.NoError(t, err, "Failed to unmarshal response")
 			assert.Equal(t, tt.expectedStatus, hcr.Status, "Health status mismatch")
-
-			// Verify no panics occurred and response is well-formed
 			assert.NotEmpty(t, hcr.Resource, "Resource should be set")
 			assert.NotZero(t, hcr.UtcDateTime, "DateTime should be set")
-
-			// For canceled contexts, verify dependencies reflect the cancellation or timeout
-			if tt.cancelBeforeServe {
-				assert.NotEmpty(t, hcr.Dependencies, "Should have dependency results")
-				for _, dep := range hcr.Dependencies {
-					assert.Equal(t, heartbeat.StatusCritical, dep.Status, "Cancelled dependency should be critical")
-					// Message can be either "canceled" (for URL checks) or "timeout" (for custom handlers)
-					assert.True(t,
-						dep.Message != "" && (dep.Message[:9] == "cancelled" || dep.Message[:7] == "request" || dep.Message[:6] == "custom"),
-						"Message should indicate cancellation or timeout, got: %s", dep.Message)
-				}
-			}
 		})
 	}
 }
@@ -843,17 +841,16 @@ func TestHandlerTimeout(t *testing.T) {
 			}
 		}
 
+		base := runtime.NumGoroutine()
 		result := heartbeat.ExecuteHandlerWithTimeout(context.Background(), slowHandler, 10*time.Millisecond)
 
 		// Should timeout and return critical status
 		assert.Equal(t, heartbeat.StatusCritical, result.Status)
 		assert.Contains(t, result.Message, "timeout")
 
-		// Give extra time for slow handler goroutine to complete
-		// This ensures we test the full lifecycle including goroutine cleanup
-		time.Sleep(600 * time.Millisecond)
-
-		// If we reach here without panic, the test passes - goroutine cleanup worked correctly
+		// The handler goroutine outlives the timeout, but it must exit once
+		// the handler returns.
+		waitForGoroutines(t, base)
 	})
 
 	// Additional test: verify channel doesn't block when result arrives after context cancellation
@@ -871,17 +868,15 @@ func TestHandlerTimeout(t *testing.T) {
 		}
 
 		// Use a very short timeout to ensure handler finishes after
+		base := runtime.NumGoroutine()
 		result := heartbeat.ExecuteHandlerWithTimeout(context.Background(), handler, 20*time.Millisecond)
 
 		// Should get timeout response
 		assert.Equal(t, heartbeat.StatusCritical, result.Status)
 		assert.Contains(t, result.Message, "timeout after 20ms")
 
-		// Wait for handler to complete and attempt to send to channel
-		time.Sleep(150 * time.Millisecond)
-
-		// If we reach here, the buffered channel successfully prevented deadlock
-		// The handler goroutine was able to send to the channel and exit cleanly
+		// The late send must not block, so the handler goroutine exits.
+		waitForGoroutines(t, base)
 	})
 }
 
@@ -1148,14 +1143,14 @@ func TestHandlerWarning(t *testing.T) {
 				t.Cleanup(tsRedirect.Close)
 
 				tsSlow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					time.Sleep(4 * time.Second) // Slow response = Warning
+					time.Sleep(slowDelay) // Slow response = Warning
 					w.WriteHeader(http.StatusOK)
 				}))
 				t.Cleanup(tsSlow.Close)
 
 				return []heartbeat.DependencyDescriptor{
 					{Connection: tsRedirect.URL, Name: "redirect-dep-1", Type: "HTTP"},
-					{Connection: tsSlow.URL, Name: "slow-dep-2", Type: "HTTP"},
+					{Connection: tsSlow.URL, Name: "slow-dep-2", Type: "HTTP", SlowThreshold: slowThreshold},
 				}
 			},
 			expectedStatus:   heartbeat.StatusWarning,
