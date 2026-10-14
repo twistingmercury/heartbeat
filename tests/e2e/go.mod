@@ -1,6 +1,6 @@
 module heartbeat/e2e
 
-go 1.27.1
+go 1.27.2
 
 require github.com/stretchr/testify v1.10.0
 
