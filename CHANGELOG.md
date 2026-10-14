@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-14
+
 ### Security
 
 - HTTP dependency results redact URL credentials in `resource`, and
@@ -56,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `CheckDependencies` is exported and now documented. The 1.1.0 entry below
+- `CheckDependencies` is exported and now documented in the README. The 1.1.0 entry below
   stating it was made internal was incorrect.
 
 ## [1.1.2] - 2026-09-09

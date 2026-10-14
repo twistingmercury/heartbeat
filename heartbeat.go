@@ -1,3 +1,6 @@
+// Package heartbeat exposes a Gin health endpoint that checks a service's
+// HTTP and custom dependencies concurrently and reports the most severe
+// status. OK and Warning return HTTP 200; Critical returns 503.
 package heartbeat
 
 import (
