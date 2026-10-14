@@ -724,7 +724,7 @@ func TestHandlerContextCancellation(t *testing.T) {
 			assert.NoError(t, err, "Failed to unmarshal response")
 			assert.Equal(t, tt.expectedStatus, hcr.Status, "Health status mismatch")
 			assert.NotEmpty(t, hcr.Resource, "Resource should be set")
-			assert.NotZero(t, hcr.UtcDateTime, "DateTime should be set")
+			assert.NotZero(t, hcr.UTCDateTime, "DateTime should be set")
 		})
 	}
 }
@@ -1315,7 +1315,7 @@ func TestHandlerWarning(t *testing.T) {
 
 			// Verify response is well-formed
 			assert.NotEmpty(t, hcr.Resource, "%s: Resource should be set", tt.description)
-			assert.NotZero(t, hcr.UtcDateTime, "%s: DateTime should be set", tt.description)
+			assert.NotZero(t, hcr.UTCDateTime, "%s: DateTime should be set", tt.description)
 			assert.GreaterOrEqual(t, hcr.RequestDuration, float64(0), "%s: RequestDuration should be >= 0", tt.description)
 
 			// Verify dependencies are populated

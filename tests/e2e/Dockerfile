@@ -1,4 +1,4 @@
-FROM ghcr.io/twistingmercury/golang-tooling:go1.27.2 AS builder
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.2@sha256:45e8b1fcf8b316516af77c885592e751a7782c0d9fadc6be970e013eebd26267 AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY *.go ./
 RUN CGO_ENABLED=0 GOOS=linux go test -c -o /e2e-tests ./...
 
 # Final stage - minimal image for running tests
-FROM alpine:latest
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 RUN apk add --no-cache ca-certificates
 

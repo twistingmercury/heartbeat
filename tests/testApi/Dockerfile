@@ -1,4 +1,4 @@
-FROM ghcr.io/twistingmercury/golang-tooling:go1.27.2 AS builder
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.2@sha256:45e8b1fcf8b316516af77c885592e751a7782c0d9fadc6be970e013eebd26267 AS builder
 
 RUN adduser -D -g '' -u 10001 appuser
 
@@ -26,7 +26,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o /build/testapi \
     .
 
-FROM alpine:latest AS runner
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runner
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # Required for Go's time.LoadLocation() since scratch has no timezone data

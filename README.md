@@ -110,8 +110,10 @@ v2 removes the Gin dependency. To upgrade:
 1. Change the import path to `github.com/twistingmercury/heartbeat/v2`.
 2. Wrap the handler: `router.GET("/health", heartbeat.Handler(...))` becomes
    `router.GET("/health", gin.WrapH(heartbeat.Handler(...)))`.
+3. Read the timestamp from `utc_date_time` instead of `utc_DateTime`. In Go,
+   the field is now `Response.UTCDateTime`.
 
-The response body, status codes and descriptor fields are unchanged.
+Status codes, the other response keys and descriptor fields are unchanged.
 
 Request the endpoint with `curl http://localhost:8080/health`. A successful
 response has this shape:
@@ -122,7 +124,7 @@ response has this shape:
   "name": "example-service",
   "resource": "example-service",
   "machine": "hostname",
-  "utc_DateTime": "2026-08-21T12:34:56Z",
+  "utc_date_time": "2026-08-21T12:34:56Z",
   "request_duration_ms": 42.5,
   "dependencies": [
     {

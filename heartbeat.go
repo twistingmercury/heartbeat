@@ -105,7 +105,7 @@ type Response struct {
 	Name            string         `json:"name,omitempty"`
 	Resource        string         `json:"resource"`
 	Machine         string         `json:"machine,omitempty"`
-	UtcDateTime     time.Time      `json:"utc_DateTime"`
+	UTCDateTime     time.Time      `json:"utc_date_time"`
 	RequestDuration float64        `json:"request_duration_ms"`
 	Message         string         `json:"message,omitempty"`
 	Dependencies    []StatusResult `json:"dependencies,omitempty"`
@@ -152,7 +152,7 @@ func Handler(svcName string, deps ...DependencyDescriptor) http.Handler {
 			Name:            svcName,
 			Resource:        svcName,
 			Machine:         hostname,
-			UtcDateTime:     st.UTC(),
+			UTCDateTime:     st.UTC(),
 			RequestDuration: durationMs(time.Since(st)),
 			Dependencies:    results,
 		}

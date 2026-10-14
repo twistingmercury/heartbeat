@@ -23,7 +23,7 @@ type Response struct {
 	Name            string         `json:"name,omitempty"`
 	Resource        string         `json:"resource"`
 	Machine         string         `json:"machine,omitempty"`
-	UtcDateTime     time.Time      `json:"utc_DateTime"`
+	UTCDateTime     time.Time      `json:"utc_date_time"`
 	RequestDuration float64        `json:"request_duration_ms"`
 	Message         string         `json:"message,omitempty"`
 	Dependencies    []StatusResult `json:"dependencies,omitempty"`
@@ -90,7 +90,7 @@ func TestHealthEndpoint_ReturnsValidResponse(t *testing.T) {
 	_, healthResp := getHealth(t)
 
 	assert.Equal(t, "testApi", healthResp.Resource, "Resource should be 'testApi'")
-	assert.False(t, healthResp.UtcDateTime.IsZero(), "UtcDateTime should be set")
+	assert.False(t, healthResp.UTCDateTime.IsZero(), "UTCDateTime should be set")
 	assert.GreaterOrEqual(t, healthResp.RequestDuration, float64(0), "RequestDuration should be non-negative")
 }
 
@@ -261,7 +261,7 @@ func TestHealthEndpoint_TimestampIsRecent(t *testing.T) {
 	_, healthResp := getHealth(t)
 
 	now := time.Now().UTC()
-	timeDiff := now.Sub(healthResp.UtcDateTime)
+	timeDiff := now.Sub(healthResp.UTCDateTime)
 
 	assert.True(t, timeDiff < time.Minute && timeDiff > -time.Minute,
 		"Timestamp should be within 1 minute of current time, got diff: %v", timeDiff)

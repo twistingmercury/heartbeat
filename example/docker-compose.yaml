@@ -1,6 +1,6 @@
 services:
   cassandra:
-    image: cassandra:5.0
+    image: cassandra:5.0@sha256:618a493bcf1f817ea2f07288a46fa76fb2d9c4dfd5a04c28227336405782889c
     container_name: cassandra-container
     ports:
       - "9042:9042"
@@ -9,7 +9,7 @@ services:
       - CASSANDRA_PASSWORD=cassandra
 
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+    image: rabbitmq:3.13-management-alpine@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
     container_name: 'rabbitmq'
     environment:
       - RABBITMQ_DEFAULT_USER=rabbit
