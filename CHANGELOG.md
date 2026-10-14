@@ -7,6 +7,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- HTTP dependency results redact URL credentials in `resource`, and
+  `DependencyDescriptor.String` redacts `connection`.
+- Transport errors no longer echo internal addresses, and panic values from
+  custom checks are logged instead of returned to callers.
+
+### Added
+
+- `CheckFunc`, a context-aware custom check. Its context is cancelled when the
+  dependency's timeout expires, so timed-out checks no longer leak goroutines.
+- `SlowThreshold` on `DependencyDescriptor` to tune when a successful HTTP
+  check is reported as `Warning`.
+
+### Changed
+
+- The health check fails closed: a custom check returning `NotSet` or an
+  unknown status is reported as `Critical` (HTTP 503). A service with no
+  dependencies reports `OK` instead of `NotSet`.
+- Concurrent requests to the handler share one run of the dependency checks.
+- `Handler` panics at startup on descriptors that cannot be checked.
+- A cancelled request returns 503 without a body instead of waiting for checks.
+- Cancellation of a custom check is reported as cancellation, not as a timeout.
+- Custom checks now report `request_duration_ms`.
+- HTTP checks drain response bodies so connections are reused.
+- The root module requires Go 1.26 instead of Go 1.27.1.
+- Build images use Go 1.27.2 and `golang.org/x/net` is updated to v0.60.0 to
+  pick up fixes for GO-2026-6603, GO-2026-6605, GO-2026-6607, GO-2026-6608 and
+  GO-2026-6610 through GO-2026-6617 flagged by govulncheck.
+- The status enum is hand-written; the `go-enum` generator is no longer needed.
+- The format gate in the build fails on unformatted code instead of rewriting
+  it, and `make test` no longer opens a browser.
+- E2E tests require every dependency to be `OK` and no longer reach the public
+  internet.
+
+### Deprecated
+
+- `StatusHandlerFunc` and `DependencyDescriptor.HandlerFunc`; use `CheckFunc`.
+
+### Removed
+
+- `tests/e2e/test-runner.sh`, which duplicated `build/build.sh`.
+
+### Fixed
+
+- `CheckDependencies` is exported and now documented. The 1.1.0 entry below
+  stating it was made internal was incorrect.
+
 ## [1.1.2] - 2026-09-09
 
 ### Changed

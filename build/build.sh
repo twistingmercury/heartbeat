@@ -27,18 +27,18 @@ cleanup() {
         exit_status="${cleanup_status}"
     fi
 
-
-
     exit "${exit_status}"
 }
 
 trap cleanup EXIT
 
 build(){
+    print::info "Building image ${IMAGE_NAME}"
     docker build -t "${IMAGE_NAME}" -f "${SCRIPT_DIR}/Dockerfile" "${PROJECT_DIR}"
 }
 
 test(){
+    print::info "Running e2e tests"
     docker compose -f "${COMPOSE_FILE}" up --build --abort-on-container-exit --exit-code-from e2e_tests
 }
 

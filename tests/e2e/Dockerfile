@@ -1,4 +1,4 @@
-FROM ghcr.io/twistingmercury/golang-tooling:go1.27.1 AS builder
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.2 AS builder
 
 WORKDIR /app
 

@@ -54,13 +54,11 @@ func httpClient() *http.Client {
 	}
 }
 
-// TestHealthEndpoint_ReturnsValidResponse verifies the /health endpoint
-// returns a properly formatted JSON response with expected fields.
-func TestHealthEndpoint_ReturnsValidResponse(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+// getHealth fetches /health once and decodes the response body.
+func getHealth(t *testing.T) (*http.Response, Response) {
+	t.Helper()
 
-	resp, err := client.Get(baseURL + "/health")
+	resp, err := httpClient().Get(getBaseURL() + "/health")
 	require.NoError(t, err, "Failed to make request to /health endpoint")
 	defer resp.Body.Close()
 
@@ -68,224 +66,90 @@ func TestHealthEndpoint_ReturnsValidResponse(t *testing.T) {
 	require.NoError(t, err, "Failed to read response body")
 
 	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON: %s", string(body))
+	require.NoError(t, json.Unmarshal(body, &healthResp),
+		"Failed to unmarshal response JSON: %s", string(body))
+	return resp, healthResp
+}
 
-	// Verify required fields are present
-	assert.NotEmpty(t, healthResp.Resource, "Resource field should not be empty")
+// findDependency returns the named dependency, failing the test if absent.
+func findDependency(t *testing.T, healthResp Response, name string) StatusResult {
+	t.Helper()
+	for _, dep := range healthResp.Dependencies {
+		if dep.Name == name {
+			return dep
+		}
+	}
+	require.FailNow(t, "dependency not found", "Expected dependency %q in response: %+v",
+		name, healthResp.Dependencies)
+	return StatusResult{}
+}
+
+// TestHealthEndpoint_ReturnsValidResponse verifies the /health endpoint
+// returns a properly formatted JSON response with expected fields.
+func TestHealthEndpoint_ReturnsValidResponse(t *testing.T) {
+	_, healthResp := getHealth(t)
+
 	assert.Equal(t, "testApi", healthResp.Resource, "Resource should be 'testApi'")
-	assert.NotEmpty(t, healthResp.Status, "Status field should not be empty")
 	assert.False(t, healthResp.UtcDateTime.IsZero(), "UtcDateTime should be set")
 	assert.GreaterOrEqual(t, healthResp.RequestDuration, float64(0), "RequestDuration should be non-negative")
 }
 
-// TestHealthEndpoint_ReturnsCorrectHTTPStatus verifies the endpoint returns
-// appropriate HTTP status codes based on overall health.
-func TestHealthEndpoint_ReturnsCorrectHTTPStatus(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+// TestHealthEndpoint_OverallStatusOK verifies that, with every dependency
+// healthy (the compose stack is health-gated), the overall status is OK and
+// the endpoint returns HTTP 200.
+func TestHealthEndpoint_OverallStatusOK(t *testing.T) {
+	resp, healthResp := getHealth(t)
 
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	// HTTP status should match overall health status
-	switch healthResp.Status {
-	case "Critical":
-		assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode,
-			"Critical status should return 503")
-	case "OK", "Warning", "NotSet":
-		assert.Equal(t, http.StatusOK, resp.StatusCode,
-			"OK/Warning/NotSet status should return 200")
-	default:
-		t.Errorf("Unexpected status value: %s", healthResp.Status)
-	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "Healthy service should return 200")
+	assert.Equal(t, "OK", healthResp.Status,
+		"Overall status should be OK; dependencies: %+v", healthResp.Dependencies)
 }
 
-// TestHealthEndpoint_IncludesDependencies verifies that dependencies are
-// checked and included in the response.
+// TestHealthEndpoint_IncludesDependencies verifies that every configured
+// dependency is checked, included in the response, and healthy.
 func TestHealthEndpoint_IncludesDependencies(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+	_, healthResp := getHealth(t)
 
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
+	require.Len(t, healthResp.Dependencies, 3, "Should have 3 dependencies")
 
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	// testApi has 3 dependencies configured
-	assert.Len(t, healthResp.Dependencies, 3, "Should have 3 dependencies")
-
-	// Verify each dependency has required fields
-	expectedDeps := map[string]bool{
-		"Golang Site":    false,
-		"database check": false,
-		"RabbitMQ check": false,
-	}
-
-	for _, dep := range healthResp.Dependencies {
-		assert.NotEmpty(t, dep.Name, "Dependency name should not be empty")
-		assert.NotEmpty(t, dep.Status, "Dependency status should not be empty")
-		assert.NotEmpty(t, dep.Resource, "Dependency resource should not be empty")
-
-		if _, exists := expectedDeps[dep.Name]; exists {
-			expectedDeps[dep.Name] = true
-		}
-	}
-
-	// Verify all expected dependencies were found
-	for name, found := range expectedDeps {
-		assert.True(t, found, "Expected dependency '%s' not found in response", name)
+	for _, name := range []string{"RabbitMQ management UI", "database check", "RabbitMQ check"} {
+		dep := findDependency(t, healthResp, name)
+		assert.NotEmpty(t, dep.Resource, "Dependency %q resource should not be empty", name)
+		assert.Equal(t, "OK", dep.Status, "Dependency %q should be OK: %s", name, dep.Message)
 	}
 }
 
-// TestHealthEndpoint_DependencyStatusValues verifies dependencies return
-// valid status values from the Status enum.
-func TestHealthEndpoint_DependencyStatusValues(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+// TestHealthEndpoint_HTTPDependency verifies the plain HTTP dependency check
+// against RabbitMQ's management UI.
+func TestHealthEndpoint_HTTPDependency(t *testing.T) {
+	_, healthResp := getHealth(t)
 
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	validStatuses := map[string]bool{
-		"NotSet":   true,
-		"OK":       true,
-		"Warning":  true,
-		"Critical": true,
-	}
-
-	for _, dep := range healthResp.Dependencies {
-		assert.True(t, validStatuses[dep.Status],
-			"Dependency '%s' has invalid status '%s'", dep.Name, dep.Status)
-	}
-
-	assert.True(t, validStatuses[healthResp.Status],
-		"Overall status '%s' is not a valid status value", healthResp.Status)
-}
-
-// TestHealthEndpoint_GolangSiteDependency verifies the external website
-// dependency check works correctly.
-func TestHealthEndpoint_GolangSiteDependency(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
-
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	var golangDep *StatusResult
-	for i, dep := range healthResp.Dependencies {
-		if dep.Name == "Golang Site" {
-			golangDep = &healthResp.Dependencies[i]
-			break
-		}
-	}
-
-	require.NotNil(t, golangDep, "Golang Site dependency should be present")
-	assert.Equal(t, "https://golang.org/", golangDep.Resource,
-		"Golang Site resource should be the golang.org URL")
-	assert.Greater(t, golangDep.RequestDuration, float64(0),
+	dep := findDependency(t, healthResp, "RabbitMQ management UI")
+	assert.Equal(t, "http://rabbitmq:15672/", dep.Resource,
+		"HTTP dependency resource should be the management UI URL")
+	assert.Equal(t, "OK", dep.Status, "HTTP dependency should be OK: %s", dep.Message)
+	assert.Greater(t, dep.RequestDuration, float64(0),
 		"Request duration should be positive for HTTP checks")
 }
 
 // TestHealthEndpoint_CassandraDependency verifies the Cassandra database
-// dependency check works correctly when Cassandra is available.
+// dependency check reports OK.
 func TestHealthEndpoint_CassandraDependency(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+	_, healthResp := getHealth(t)
 
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	var cassandraDep *StatusResult
-	for i, dep := range healthResp.Dependencies {
-		if dep.Name == "database check" {
-			cassandraDep = &healthResp.Dependencies[i]
-			break
-		}
-	}
-
-	require.NotNil(t, cassandraDep, "database check dependency should be present")
-
-	// The status depends on whether Cassandra is actually running
-	// We just verify the check completed with a valid status
-	validStatuses := []string{"OK", "Critical", "Warning", "NotSet"}
-	assert.Contains(t, validStatuses, cassandraDep.Status,
-		"Cassandra check should return a valid status")
-	assert.NotEmpty(t, cassandraDep.Message,
-		"Cassandra check should include a message")
+	dep := findDependency(t, healthResp, "database check")
+	assert.Equal(t, "OK", dep.Status, "Cassandra check should be OK: %s", dep.Message)
+	assert.NotEmpty(t, dep.Message, "Cassandra check should include a message")
 }
 
-// TestHealthEndpoint_RabbitMQDependency verifies the RabbitMQ dependency
-// check works correctly when RabbitMQ is available.
+// TestHealthEndpoint_RabbitMQDependency verifies the RabbitMQ aliveness
+// dependency check reports OK.
 func TestHealthEndpoint_RabbitMQDependency(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+	_, healthResp := getHealth(t)
 
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	var rmqDep *StatusResult
-	for i, dep := range healthResp.Dependencies {
-		if dep.Name == "RabbitMQ check" {
-			rmqDep = &healthResp.Dependencies[i]
-			break
-		}
-	}
-
-	require.NotNil(t, rmqDep, "RabbitMQ check dependency should be present")
-
-	// The status depends on whether RabbitMQ is actually running
-	validStatuses := []string{"OK", "Critical", "Warning", "NotSet"}
-	assert.Contains(t, validStatuses, rmqDep.Status,
-		"RabbitMQ check should return a valid status")
-	assert.NotEmpty(t, rmqDep.Message,
-		"RabbitMQ check should include a message")
+	dep := findDependency(t, healthResp, "RabbitMQ check")
+	assert.Equal(t, "OK", dep.Status, "RabbitMQ check should be OK: %s", dep.Message)
+	assert.NotEmpty(t, dep.Message, "RabbitMQ check should include a message")
 }
 
 // TestHealthEndpoint_MethodNotAllowed verifies that non-GET methods
@@ -371,6 +235,11 @@ func TestHealthEndpoint_ConcurrentRequests(t *testing.T) {
 				return
 			}
 
+			if resp.StatusCode != http.StatusOK || healthResp.Status != "OK" {
+				results <- fmt.Errorf("unhealthy response: HTTP %d, status %q", resp.StatusCode, healthResp.Status)
+				return
+			}
+
 			if healthResp.Resource != "testApi" {
 				results <- fmt.Errorf("unexpected resource: %s", healthResp.Resource)
 				return
@@ -389,19 +258,7 @@ func TestHealthEndpoint_ConcurrentRequests(t *testing.T) {
 // TestHealthEndpoint_TimestampIsRecent verifies the returned timestamp
 // is recent (within the last minute).
 func TestHealthEndpoint_TimestampIsRecent(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
-
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
+	_, healthResp := getHealth(t)
 
 	now := time.Now().UTC()
 	timeDiff := now.Sub(healthResp.UtcDateTime)
@@ -411,23 +268,9 @@ func TestHealthEndpoint_TimestampIsRecent(t *testing.T) {
 }
 
 // TestHealthEndpoint_MachineHostname verifies the machine/hostname
-// field is populated.
+// field is populated (the testApi container always has a hostname).
 func TestHealthEndpoint_MachineHostname(t *testing.T) {
-	client := httpClient()
-	baseURL := getBaseURL()
+	_, healthResp := getHealth(t)
 
-	resp, err := client.Get(baseURL + "/health")
-	require.NoError(t, err, "Failed to make request to /health endpoint")
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "Failed to read response body")
-
-	var healthResp Response
-	err = json.Unmarshal(body, &healthResp)
-	require.NoError(t, err, "Failed to unmarshal response JSON")
-
-	// Machine field should be populated (hostname of the container/host)
-	// It might be empty in some environments, so we just verify the field exists
-	t.Logf("Machine hostname: %s", healthResp.Machine)
+	assert.NotEmpty(t, healthResp.Machine, "Machine hostname should be populated")
 }
