@@ -11,9 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"github.com/twistingmercury/heartbeat"
+	"github.com/twistingmercury/heartbeat/v2"
 )
 
 // slowDelay and slowThreshold let tests exercise slow-response warnings
@@ -125,11 +124,10 @@ func TestHandlerReturnCritical(t *testing.T) {
 	}
 
 	resp := httptest.NewRecorder()
-	gin.SetMode(gin.TestMode)
-	c, r := gin.CreateTestContext(resp)
-	r.GET("/test", heartbeat.Handler("unit-test", deps...))
-	c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-	r.ServeHTTP(resp, c.Request)
+	r := http.NewServeMux()
+	r.Handle("GET /test", heartbeat.Handler("unit-test", deps...))
+	req, _ := http.NewRequest(http.MethodGet, "/test", nil)
+	r.ServeHTTP(resp, req)
 
 	data := resp.Body.Bytes()
 	assert.Greater(t, len(data), 0)
@@ -688,10 +686,9 @@ func TestHandlerContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			deps := tt.setupDeps()
 
-			// Set up Gin test context
-			gin.SetMode(gin.TestMode)
+			// Set up test router
 			resp := httptest.NewRecorder()
-			c, r := gin.CreateTestContext(resp)
+			r := http.NewServeMux()
 
 			// Create request with cancellable context
 			var req *http.Request
@@ -704,12 +701,11 @@ func TestHandlerContextCancellation(t *testing.T) {
 			}
 
 			// Set up handler and request
-			r.GET("/health", heartbeat.Handler("test-service", deps...))
-			c.Request = req
+			r.Handle("GET /health", heartbeat.Handler("test-service", deps...))
 
 			// Serve the request
 			start := time.Now()
-			r.ServeHTTP(resp, c.Request)
+			r.ServeHTTP(resp, req)
 			elapsed := time.Since(start)
 
 			// Verify response
@@ -1291,18 +1287,16 @@ func TestHandlerWarning(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			deps := tt.setupDeps(t)
 
-			// Set up Gin test context
-			gin.SetMode(gin.TestMode)
+			// Set up test router
 			resp := httptest.NewRecorder()
-			c, r := gin.CreateTestContext(resp)
+			r := http.NewServeMux()
 
 			// Create request
 			req, _ := http.NewRequest(http.MethodGet, "/health", nil)
 
 			// Set up handler and serve request
-			r.GET("/health", heartbeat.Handler("test-service", deps...))
-			c.Request = req
-			r.ServeHTTP(resp, c.Request)
+			r.Handle("GET /health", heartbeat.Handler("test-service", deps...))
+			r.ServeHTTP(resp, req)
 
 			// Verify HTTP status code is 200 (not 503)
 			assert.Equal(t, tt.expectedHTTPCode, resp.Code,
@@ -1629,11 +1623,10 @@ func TestHandlerMachineField(t *testing.T) {
 
 	// Create test context and router
 	resp := httptest.NewRecorder()
-	gin.SetMode(gin.TestMode)
-	c, r := gin.CreateTestContext(resp)
-	r.GET("/test", heartbeat.Handler("test-service", deps...))
-	c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-	r.ServeHTTP(resp, c.Request)
+	r := http.NewServeMux()
+	r.Handle("GET /test", heartbeat.Handler("test-service", deps...))
+	req, _ := http.NewRequest(http.MethodGet, "/test", nil)
+	r.ServeHTTP(resp, req)
 
 	// Parse the response
 	var hcr heartbeat.Response
@@ -1769,18 +1762,16 @@ func TestHandlerNameField(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			deps := tt.setupDeps(t)
 
-			// Set up Gin test context
-			gin.SetMode(gin.TestMode)
+			// Set up test router
 			resp := httptest.NewRecorder()
-			c, r := gin.CreateTestContext(resp)
+			r := http.NewServeMux()
 
 			// Create request
 			req, _ := http.NewRequest(http.MethodGet, "/health", nil)
 
 			// Set up handler and serve request
-			r.GET("/health", heartbeat.Handler(tt.svcName, deps...))
-			c.Request = req
-			r.ServeHTTP(resp, c.Request)
+			r.Handle("GET /health", heartbeat.Handler(tt.svcName, deps...))
+			r.ServeHTTP(resp, req)
 
 			// Parse response body
 			var hcr heartbeat.Response

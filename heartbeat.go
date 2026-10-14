@@ -1,6 +1,10 @@
-// Package heartbeat exposes a Gin health endpoint that checks a service's
+// Package heartbeat exposes a net/http health endpoint that checks a service's
 // HTTP and custom dependencies concurrently and reports the most severe
 // status. OK and Warning return HTTP 200; Critical returns 503.
+//
+// The handler works with any router built on net/http. With Gin, wrap it:
+//
+//	r.GET("/health", gin.WrapH(heartbeat.Handler("my-service", deps...)))
 package heartbeat
 
 import (
@@ -17,8 +21,6 @@ import (
 	"slices"
 	"sync"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -114,7 +116,9 @@ func (h *Response) String() string {
 	return string(text)
 }
 
-// Handler returns the health of the app as a Response object.
+// Handler returns an http.Handler that reports the health of the app as a
+// JSON Response. It does not check the request method; register it for GET
+// on your router, for example mux.Handle("GET /health", ...).
 //
 // It panics if a descriptor cannot be checked (no check and no Connection,
 // an invalid or non-HTTP URL, or a negative duration), so configuration
@@ -122,7 +126,7 @@ func (h *Response) String() string {
 //
 // Concurrent requests share one run of the dependency checks, so a burst of
 // probes does not multiply the load on the dependencies.
-func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
+func Handler(svcName string, deps ...DependencyDescriptor) http.Handler {
 	deps = slices.Clone(deps)
 	for i := range deps {
 		if err := deps[i].validate(); err != nil {
@@ -133,13 +137,13 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 	hostname, _ := os.Hostname()
 	var checks flightGroup
 
-	return func(c *gin.Context) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st := time.Now()
 
-		status, results, err := checks.do(c.Request.Context(), deps)
+		status, results, err := checks.do(r.Context(), deps)
 		if err != nil {
 			// The caller went away before the checks finished.
-			c.Status(http.StatusServiceUnavailable)
+			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 
@@ -157,8 +161,15 @@ func Handler(svcName string, deps ...DependencyDescriptor) gin.HandlerFunc {
 		if status != StatusOK && status != StatusWarning {
 			httpStatus = http.StatusServiceUnavailable
 		}
-		c.JSON(httpStatus, hb)
-	}
+		body, err := json.Marshal(hb)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(httpStatus)
+		_, _ = w.Write(body)
+	})
 }
 
 // CheckDependencies runs every dependency check concurrently and returns the

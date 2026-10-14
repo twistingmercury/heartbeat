@@ -1,7 +1,8 @@
 # Heartbeat Example Application
 
 This application demonstrates an HTTP dependency and custom Cassandra and
-RabbitMQ checks. It exposes Heartbeat through Gin at `GET /health`.
+RabbitMQ checks. It exposes Heartbeat through Gin at `GET /health` by wrapping the
+`http.Handler` with `gin.WrapH`.
 
 ## Prerequisites
 

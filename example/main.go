@@ -12,7 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
-	"github.com/twistingmercury/heartbeat"
+	"github.com/twistingmercury/heartbeat/v2"
 )
 
 const checkTimeout = 2 * time.Second
@@ -73,7 +73,7 @@ func main() {
 	}
 
 	// Register the healthcheck endpoint by passing the name of the service
-	r.GET("/health", heartbeat.Handler("example", deps...))
+	r.GET("/health", gin.WrapH(heartbeat.Handler("example", deps...)))
 	if err := r.Run(); err != nil {
 		log.Fatal(err)
 	}

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the module path is now `github.com/twistingmercury/heartbeat/v2`.
+- **Breaking:** `Handler` returns a standard `http.Handler` instead of a
+  `gin.HandlerFunc`. Gin users register it with
+  `router.GET("/health", gin.WrapH(heartbeat.Handler(...)))`. The response
+  body, status codes and `Content-Type` are unchanged.
+
+### Removed
+
+- The dependency on Gin. The library now needs only the standard library at
+  run time, which removes about 30 indirect modules from consumers' builds.
+
 ## [1.2.0] - 2026-10-14
 
 ### Security

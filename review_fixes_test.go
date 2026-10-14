@@ -13,17 +13,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/heartbeat"
+	"github.com/twistingmercury/heartbeat/v2"
 )
 
-func serveHealth(t *testing.T, h gin.HandlerFunc) (*httptest.ResponseRecorder, heartbeat.Response) {
+func serveHealth(t *testing.T, h http.Handler) (*httptest.ResponseRecorder, heartbeat.Response) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/health", h)
+	r := http.NewServeMux()
+	r.Handle("GET /health", h)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
 	var resp heartbeat.Response
@@ -220,9 +218,8 @@ func TestConcurrentRequestsShareOneCheck(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/health", heartbeat.Handler("svc", heartbeat.DependencyDescriptor{Name: "dep", Connection: ts.URL}))
+	r := http.NewServeMux()
+	r.Handle("GET /health", heartbeat.Handler("svc", heartbeat.DependencyDescriptor{Name: "dep", Connection: ts.URL}))
 
 	var wg sync.WaitGroup
 	codes := make([]int, 50)
@@ -245,4 +242,18 @@ func TestConcurrentRequestsShareOneCheck(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, int32(2), hits.Load())
+}
+
+func TestHandlerServesJSONOnServeMux(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.Handle("GET /health", heartbeat.Handler("svc"))
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
+
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/health", nil))
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
 }
