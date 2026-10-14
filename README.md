@@ -151,7 +151,7 @@ response.
 
 ### Quick Start
 
-The root module requires Go 1.26 or newer. The build image uses Go 1.27.1.
+The root module requires Go 1.26 or newer. The build image uses Go 1.27.2.
 The standard build is Docker-first: install Docker with the Compose plugin to
 run the complete validation suite without a host Go toolchain.
 
