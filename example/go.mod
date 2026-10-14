@@ -1,13 +1,13 @@
 module example
 
-replace github.com/twistingmercury/heartbeat => ../
+replace github.com/twistingmercury/heartbeat/v2 => ../
 
 go 1.27.2
 
 require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/gocql/gocql v1.7.0
-	github.com/twistingmercury/heartbeat v0.9.1
+	github.com/twistingmercury/heartbeat/v2 v2.0.0
 )
 
 require (

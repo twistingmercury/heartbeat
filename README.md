@@ -2,9 +2,11 @@
 
 > **Maturity Level**: Basic - Production-ready and actively evolving.
 >
-> **Version**: v1.2.0
+> **Version**: v2.0.0
 
-Heartbeat is a Go package for exposing Gin-based health endpoints. It checks
+Heartbeat is a Go package for exposing health endpoints. `Handler` returns a
+standard `http.Handler`, so it works with `net/http`, Gin, chi, Echo or any
+other router, and adds no web framework to your dependencies. It checks
 HTTP services and application-defined dependencies, then returns one aggregate
 health response suitable for Kubernetes readiness and liveness probes.
 
@@ -25,20 +27,21 @@ health response suitable for Kubernetes readiness and liveness probes.
 Install the package:
 
 ```bash
-go get github.com/twistingmercury/heartbeat@v1.2.0
+go get github.com/twistingmercury/heartbeat/v2
 ```
 
-Define HTTP or custom dependencies and register the handler with Gin:
+Define HTTP or custom dependencies and register the handler with `net/http`:
 
 ```go
 package main
 
 import (
     "context"
+    "log"
+    "net/http"
     "time"
 
-    "github.com/gin-gonic/gin"
-    "github.com/twistingmercury/heartbeat"
+    "github.com/twistingmercury/heartbeat/v2"
 )
 
 func checkDatabase(ctx context.Context) heartbeat.StatusResult {
@@ -51,8 +54,6 @@ func checkDatabase(ctx context.Context) heartbeat.StatusResult {
 }
 
 func main() {
-    router := gin.Default()
-
     dependencies := []heartbeat.DependencyDescriptor{
         {
             Name:       "Go website",
@@ -68,10 +69,51 @@ func main() {
         },
     }
 
-    router.GET("/health", heartbeat.Handler("example-service", dependencies...))
-    _ = router.Run(":8080")
+    mux := http.NewServeMux()
+    mux.Handle("GET /health", heartbeat.Handler("example-service", dependencies...))
+    log.Fatal(http.ListenAndServe(":8080", mux))
 }
 ```
+
+`Handler` does not check the request method, so register it for `GET` on your
+router as above.
+
+### Using Heartbeat with Gin
+
+Wrap the handler with `gin.WrapH`. Everything else stays the same:
+
+```go
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/twistingmercury/heartbeat/v2"
+)
+
+router := gin.Default()
+router.GET("/health", gin.WrapH(heartbeat.Handler("example-service", dependencies...)))
+_ = router.Run(":8080")
+```
+
+Gin's middleware (logging, recovery, auth) runs before the handler as usual.
+The [example application](example/README.md) and the E2E test API both serve
+Heartbeat through Gin this way.
+
+### Using Heartbeat with other routers
+
+Any router that accepts an `http.Handler` can mount it directly, for example
+`r.Method(http.MethodGet, "/health", h)` in chi or
+`e.GET("/health", echo.WrapHandler(h))` in Echo.
+
+### Upgrading from v1
+
+v2 removes the Gin dependency. To upgrade:
+
+1. Change the import path to `github.com/twistingmercury/heartbeat/v2`.
+2. Wrap the handler: `router.GET("/health", heartbeat.Handler(...))` becomes
+   `router.GET("/health", gin.WrapH(heartbeat.Handler(...)))`.
+3. Read the timestamp from `utc_date_time` instead of `utc_DateTime`. In Go,
+   the field is now `Response.UTCDateTime`.
+
+Status codes, the other response keys and descriptor fields are unchanged.
 
 Request the endpoint with `curl http://localhost:8080/health`. A successful
 response has this shape:
@@ -82,7 +124,7 @@ response has this shape:
   "name": "example-service",
   "resource": "example-service",
   "machine": "hostname",
-  "utc_DateTime": "2026-08-21T12:34:56Z",
+  "utc_date_time": "2026-08-21T12:34:56Z",
   "request_duration_ms": 42.5,
   "dependencies": [
     {
@@ -105,7 +147,7 @@ response has this shape:
 }
 ```
 
-To serve the result from something other than Gin, call
+To build your own response instead of using `Handler`, call
 `heartbeat.CheckDependencies` directly. It runs the same concurrent, fail-closed
 checks and returns the aggregate status with the per-dependency results in
 declaration order. Unlike `Handler`, it reports a misconfigured descriptor as

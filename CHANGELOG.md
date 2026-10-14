@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the module path is now `github.com/twistingmercury/heartbeat/v2`.
+- **Breaking:** `Handler` returns a standard `http.Handler` instead of a
+  `gin.HandlerFunc`. Gin users register it with
+  `router.GET("/health", gin.WrapH(heartbeat.Handler(...)))`. Status codes and
+  `Content-Type` are unchanged.
+- **Breaking:** the response timestamp key is now `utc_date_time` (was
+  `utc_DateTime`), matching the other snake_case keys, and the Go field is
+  `Response.UTCDateTime` (was `UtcDateTime`).
+
+### Removed
+
+- The dependency on Gin. The library now needs only the standard library at
+  run time, which removes about 30 indirect modules from consumers' builds.
+
 ## [1.2.0] - 2026-10-14
 
 ### Security
