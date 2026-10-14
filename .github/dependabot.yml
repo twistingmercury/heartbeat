@@ -1,0 +1,45 @@
+# Keeps pinned versions current. Actions and images are pinned to SHAs and
+# digests; Dependabot updates the digest and the tag beside it together.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /build
+      - /tests/testApi
+      - /tests/e2e
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directories:
+      - /tests
+      - /example
+    schedule:
+      interval: weekly
+    groups:
+      docker-compose:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directories:
+      - /
+      - /example
+      - /tests/testApi
+      - /tests/e2e
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-and-patch:
+        update-types: ["minor", "patch"]
