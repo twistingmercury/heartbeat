@@ -34,7 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cancellation of a custom check is reported as cancellation, not as a timeout.
 - Custom checks now report `request_duration_ms`.
 - HTTP checks drain response bodies so connections are reused.
-- The root module requires Go 1.26 instead of Go 1.27.1.
+- The root module requires Go 1.26 instead of Go 1.27.1, and pins the
+  `go1.27.2` toolchain for development builds. The workspace, example, test API
+  and E2E modules require Go 1.27.2.
 - Build images use Go 1.27.2 and `golang.org/x/net` is updated to v0.60.0 to
   pick up fixes for GO-2026-6603, GO-2026-6605, GO-2026-6607, GO-2026-6608 and
   GO-2026-6610 through GO-2026-6617 flagged by govulncheck.
