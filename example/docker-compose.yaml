@@ -9,7 +9,7 @@ services:
       - CASSANDRA_PASSWORD=cassandra
 
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
+    image: rabbitmq:4.3-management-alpine@sha256:3ef7f7e89fed709a78f79b8b5f4e30e1312a1d4089da752e23595566d9d61a95
     container_name: 'rabbitmq'
     environment:
       - RABBITMQ_DEFAULT_USER=rabbit
