@@ -40,8 +40,10 @@ var httpClient = &http.Client{}
 type StatusHandlerFunc func() (status StatusResult)
 
 // CheckFunc returns the status of a resource. The context is cancelled when
-// the dependency's timeout expires or the caller goes away; the check must
-// return promptly once that happens.
+// the dependency's timeout expires or, when CheckDependencies is called
+// directly, when the context the caller passed is cancelled. Under Handler a
+// client disconnect does not cancel it, because concurrent requests share one
+// run of the checks. The check must return promptly once the context is done.
 type CheckFunc func(ctx context.Context) StatusResult
 
 // DependencyDescriptor defines a resource to be checked during a heartbeat request.
@@ -336,19 +338,17 @@ func checkURL(parent context.Context, urlStr string, timeout, slowThreshold time
 	return hsr
 }
 
-// parseCheckURL accepts absolute http and https URLs. Its errors never
-// contain the URL, which may carry credentials.
+// parseCheckURL accepts absolute http and https URLs. Its errors are fixed
+// strings that contain no part of the input: the input may carry credentials,
+// and url.Parse errors and a malformed URL's apparent scheme can quote a
+// password fragment or a username.
 func parseCheckURL(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		var ue *url.Error
-		if errors.As(err, &ue) {
-			err = ue.Err
-		}
-		return nil, fmt.Errorf("invalid URL: %v", err)
+		return nil, errors.New("invalid URL")
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported URL scheme: %q (only http/https allowed)", u.Scheme)
+		return nil, errors.New("unsupported URL scheme (only http/https allowed)")
 	}
 	if u.Host == "" {
 		return nil, errors.New("invalid URL: missing host")
@@ -356,8 +356,10 @@ func parseCheckURL(raw string) (*url.URL, error) {
 	return u, nil
 }
 
-// describeRequestError reports why a request failed without echoing the
-// addresses that transport errors embed.
+// describeRequestError reports why a request failed. It names the failed
+// operation and its cause for a *net.OpError, which can include the host name
+// when the cause is a DNS failure, and falls back to a generic message for
+// other errors. The request URL and the dialed address are never included.
 func describeRequestError(parent context.Context, err error, timeout time.Duration) string {
 	if perr := parent.Err(); perr != nil {
 		return fmt.Sprintf("request cancelled: %v", perr)

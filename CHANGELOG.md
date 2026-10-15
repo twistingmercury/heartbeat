@@ -7,6 +7,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- Parse errors for dependency URLs no longer echo any part of the URL. They
+  could expose a password fragment or a username in the startup panic text and
+  in a result `message`.
+
 ## [2.0.0] - 2026-10-15
 
 ### Changed

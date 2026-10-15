@@ -196,8 +196,10 @@ response.
   it has no context, so a hung handler keeps its goroutine after the timeout.
   If both are set, `CheckFunc` wins, and either one takes precedence over
   `Connection`.
-- Responses never include URL credentials, transport addresses or panic
-  values. Panics are logged with `log/slog` and reported as `Critical`.
+- Responses never include URL credentials or panic values, and error text for
+  a malformed dependency URL never quotes any part of it. A failed request can
+  still report its cause, which for a DNS failure may name the host. Panics are
+  logged with `log/slog` and reported as `Critical`.
 - Use one custom check per dependency so failures remain attributable.
 - `Warning` deliberately returns HTTP 200. Use `Critical` when an orchestrator
   should remove the instance from service.
