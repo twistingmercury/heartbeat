@@ -366,6 +366,37 @@ func TestHandlerRejectsInvalidDescriptors(t *testing.T) {
 	})
 }
 
+// leakyURLs are malformed URLs whose parse errors used to echo a password
+// fragment or a username. Each secret is the fragment that must not appear.
+var leakyURLs = []struct {
+	name   string
+	url    string
+	secret string
+}{
+	{"password in bad port", "http://admin:hunter2/x@db.internal/", "hunter2"},
+	{"credentials parsed as scheme", "admin:hunter2@db/", "admin"},
+	{"scheme-like username", "svcuser:pw@db.internal:5432/", "svcuser"},
+}
+
+func TestHandlerPanicDoesNotEchoURL(t *testing.T) {
+	for _, tt := range leakyURLs {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := heartbeat.DependencyDescriptor{Name: "db", Connection: tt.url}
+
+			var recovered any
+			func() {
+				defer func() { recovered = recover() }()
+				heartbeat.Handler("svc", dep)
+			}()
+
+			require.NotNil(t, recovered)
+			text := fmt.Sprint(recovered)
+			assert.NotContains(t, text, tt.secret)
+			assert.NotContains(t, text, "hunter2")
+		})
+	}
+}
+
 func TestHandlerContextCancellation(t *testing.T) {
 	tests := []struct {
 		name              string

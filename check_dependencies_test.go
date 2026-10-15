@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/twistingmercury/heartbeat/v2"
 )
 
@@ -314,6 +315,22 @@ func TestCheckDependenciesRace(t *testing.T) {
 					"Iteration %d: Final status %v doesn't match maximum individual status %v - mutex may not be protecting status variable",
 					iteration, status, maxStatus)
 			}
+		})
+	}
+}
+
+func TestCheckDependenciesDoesNotEchoURL(t *testing.T) {
+	for _, tt := range leakyURLs {
+		t.Run(tt.name, func(t *testing.T) {
+			deps := []heartbeat.DependencyDescriptor{{Name: "db", Connection: tt.url}}
+
+			status, results := heartbeat.CheckDependencies(context.Background(), deps)
+
+			assert.Equal(t, heartbeat.StatusCritical, status)
+			require.Len(t, results, 1)
+			assert.Equal(t, heartbeat.StatusCritical, results[0].Status)
+			assert.NotContains(t, results[0].Message, tt.secret)
+			assert.NotContains(t, results[0].Message, "hunter2")
 		})
 	}
 }
