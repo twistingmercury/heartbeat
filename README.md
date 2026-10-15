@@ -2,7 +2,7 @@
 
 > **Maturity Level**: Basic - Production-ready and actively evolving.
 >
-> **Version**: v2.0.0
+> **Version**: v2.0.1
 
 Heartbeat is a Go package for exposing health endpoints. `Handler` returns a
 standard `http.Handler`, so it works with `net/http`, Gin, chi, Echo or any
