@@ -1,4 +1,4 @@
-FROM ghcr.io/twistingmercury/golang-tooling:go1.27.2@sha256:46ce574e9e3f319ba907e080a87b7e2f32bdbc6f11ab8035c739ab6090703249 AS builder
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.3@sha256:c0d4ae73afa6c491cfc280802d3539d82937603f7abccc270a797c0ecfe1a159 AS builder
 
 RUN adduser -D -g '' -u 10001 appuser
 
