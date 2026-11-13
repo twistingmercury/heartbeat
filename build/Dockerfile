@@ -1,4 +1,4 @@
-FROM ghcr.io/twistingmercury/golang-tooling:go1.27.3@sha256:c0d4ae73afa6c491cfc280802d3539d82937603f7abccc270a797c0ecfe1a159
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.3@sha256:12277dd36b15d77a0a938f5cca30724941c540a28bd95ff25357b3ead8bff4b4
 
 RUN apk add --no-cache bash gcc musl-dev
 
